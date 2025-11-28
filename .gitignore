@@ -1,8 +1,0 @@
-node_modules/
-storage/
-plugins/
-.readme/
-.gitignore
-package-lock.json
-README.md
-.env
