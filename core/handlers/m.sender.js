@@ -25,7 +25,7 @@ export default async ({ m, cached, message, contextInfo }) => {
     m.sender.getDesc = async () => await cached.sender.desc(m.sender.id);
     m.sender.getPhoto = async () => await cached.sender.photo(m.sender.id, 'image')
     m.sender.role = async (...array) => array.some(role => m.sender.roles[role]);
-    m.sender.mentioned = contextInfo ? contextInfo.mentionedJid : [];
+    m.sender.mentioned = contextInfo.mentionedJid ?? [];
 
 
     // store

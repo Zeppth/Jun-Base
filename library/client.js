@@ -6,7 +6,7 @@ import {
     fetchLatestBaileysVersion,
     useMultiFileAuthState
 } from '@whiskeysockets/baileys';
-import node_cache from 'node-cache';
+//import node_cache from 'node-cache';
 import $process from './process.js';
 import { randomBytes } from 'crypto';
 import pino from 'pino';
@@ -20,7 +20,7 @@ export async function MakeBot(conn = {
     phoneNumber: ''
 }, store) {
     const _path = $process.env.path
-    const msgRetryCounterCache = new node_cache()
+    //const msgRetryCounterCache = new node_cache()
     let { state, saveCreds } = await useMultiFileAuthState(_path.creds)
     const { version, isLatest } = await fetchLatestBaileysVersion();
 
@@ -36,7 +36,7 @@ export async function MakeBot(conn = {
         keepAliveIntervalMs: 30000,
         markOnlineOnConnect: false,
         generateHighQualityLinkPreview: true,
-        msgRetryCounterCache,
+        //msgRetryCounterCache,
         appStateMacVerification: {
             patch: true,
             snapshot: true

@@ -21,16 +21,22 @@ export class Plugins {
         }).on('add', (filePath) => {
             const file_path = path.relative
                 (this['@folderPath'], filePath);
+
+            console.log(global.PLUGINS_MSG.newPlugin, file_path);
             this.set(file_path);
         }).on('change', (filePath) => {
             const file_path = path.relative
                 (this['@folderPath'], filePath);
+
+            console.log(global.PLUGINS_MSG.updatedPlugin, file_path);
             if (this['@plugins'].has(file_path))
                 this['@plugins'].delete(file_path)
             setTimeout(() => this.set(file_path), 1000);
         }).on('unlink', (filePath) => {
             const file_path = path.relative
                 (this['@folderPath'], filePath);
+
+            console.log(global.PLUGINS_MSG.deletedPlugin, file_path);
             if (this['@plugins'].has(file_path))
                 this['@plugins'].delete(file_path);
         }).on('error', e => logger.error(e));

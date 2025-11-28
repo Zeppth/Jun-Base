@@ -14,7 +14,9 @@ export default async ({ m, sock }) => {
     m.args = m.body.trim().split(/ +/).slice(1)
     m.text = m.args.length > 0 ? m.args.join(" ") : m.body;
 
-    if (global.settings.mainBotPrefix) {
+    const Prefix = global.settings.mainBotPrefix;
+    
+    if (Prefix && Prefix.includes(m.body[0])) {
 
         m.command = m.body.substring(1).trim()
             .split(/ +/)[0].toLowerCase()

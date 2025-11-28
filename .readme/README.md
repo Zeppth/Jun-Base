@@ -13,7 +13,7 @@ Configura el archivo `.env` con tus credenciales antes de iniciar.
 
 ## Estructura
 
-El framework se organiza en tres capas:
+Se organiza en tres capas:
 
 **Objetos m**: Representan mensajes procesados con propiedades normalizadas.
 

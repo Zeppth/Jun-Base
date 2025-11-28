@@ -1,4 +1,5 @@
 // ./config.js
+import { color } from './library/utils.js';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -7,21 +8,37 @@ global.readMore = String
     .fromCharCode(8206)
     .repeat(850);
 
-global.settings = {
-    "setDBPort": 8000,
-    "setServerIp": "",
+global.PLUGINS_MSG = {
+    newPlugin: `${color.bg.rgb(119, 205, 255)}${color.rgb(0, 0, 0)}Nuevo plugin: ${color.rgb(255, 255, 255)}${color.reset}`,
+    updatedPlugin: `${color.bg.rgb(239, 250, 142)}${color.rgb(0, 0, 0)}Recargando plugin: ${color.rgb(255, 255, 255)}${color.reset}`,
+    deletedPlugin: `${color.bg.rgb(241, 114, 114)}${color.rgb(0, 0, 0)}Plugin eliminado: ${color.rgb(255, 255, 255)}${color.reset}`
+}
 
+global.REACT_EMOJIS = {
+    wait: "⌛",
+    done: "✔️",
+    error: "✖️"
+}
+
+global.MSG = {
+    rowner: 'Este comando solo puede ser utilizado por el *dueño*',
+    owner: 'Este comando solo puede ser utilizado por un *propietario*',
+    modr: 'Este comando solo puede ser utilizado por un *moderador*',
+    premium: 'Esta solicitud es solo para usuarios *premium*',
+    group: 'Este comando solo se puede usar en *grupos*',
+    private: 'Este comando solo se puede usar por *chat privado*',
+    admin: 'Este comando solo puede ser usado por los *administradores del grupo*',
+    botAdmin: 'El bot necesita *ser administrador* para usar este comando',
+    unreg: 'Regístrese para usar esta función escribiendo:\n\n.registrar nombre.edad',
+    restrict: 'Esta función está desactivada'
+}
+
+global.settings = {
     "mainBotStore": false,
-    "mainBotNumber": "",
     "mainBotPrefix": ".¿?¡!#%&/,~@",
     "mainBotName": "@Jun",
     "mainBotAuto-read": true,
 
-    "reactEmojis": {
-        "waiting": "⌛",
-        "success": "✔️",
-        "failure": "✖️"
-    },
     "SetUserRoles": {
         "5216678432366": {
             "rowner": true,

@@ -88,3 +88,9 @@ export class TmpStore {
         this.Timeout.clear();
     }
 }
+
+export const color = {
+    rgb: (r, g, b) => `\x1b[38;2;${r};${g};${b}m`,
+    bg: { rgb: (r, g, b) => `\x1b[48;2;${r};${g};${b}m` },
+    reset: '\x1b[0m'
+}

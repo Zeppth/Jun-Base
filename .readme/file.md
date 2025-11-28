@@ -1,156 +1,126 @@
-- `id: "3EB09392F8A1293",`
-- `type: "extendedTextMessage",`
-    
-- `content: {`
-    - `text: ".ban @573001234567",`
-    - `args: [".ban", "@573001234567"],`
-    - `media: false`
-`},`
-- `    // Referencia al mensaje respondido (si existe)
-    quoted: {
-        id: "3EB099999999999",                      // ID del mensaje al que se responde
-        type: "imageMessage",                       // Tipo del mensaje original
-        sender: { id: "573001234567@s..." }         // ID del autor original
-    },`
+# Objeto `m`
 
+El objeto `m` se construye en `core.handler.js` y se enriquece mediante varios submódulos (`m.*.js`). Es el argumento principal que reciben tus plugins y scripts.
 
-/* ======================================================================================
-       🟦 FASE 2: ENTIDADES Y UTILIDADES
-       Se cargan identidades básicas y funciones de utilidad.
-       Archivos: m.bot.js, m.chat.js, m.sender.js, m.assign.js
-       ====================================================================================== */
+## Propiedades Raíz
+## `m` (Propiedades Raíz)
+Propiedades accesibles directamente desde `m`.
 
-    // Identidad del Bot
-    bot: {
-        id: "573000000000@lid",                     // ID interno del bot
-        name: "Jun Bot",                            // Nombre de perfil del bot
-        fromMe: false,                              // ¿El mensaje lo envié yo?
-        roles: { admin: false },                    // (Se actualizará en Fase 3 si es grupo)
-        
-        // Métodos inyectados
-        getDesc: [AsyncFunction],                   // Obtener descripción del bot
-        setPhoto: [AsyncFunction],                  // Cambiar foto de perfil
-        mute: [AsyncFunction],                      // Silenciar un chat
-        block: [AsyncFunction]                      // Bloquear usuario
-    },
+*   **Propiedades:**
+    * `m.id`: ID único del mensaje (`message.key.id`).
+    * `m.message`: Objeto crudo del mensaje (Raw WebMessageInfo).
+    * `m.type`: Tipo de mensaje principal (ej. `conversation`, `imageMessage`).
+    * `m.body`: Contenido textual completo del mensaje.
+    * `m.isCmd`: `true` si el mensaje fue detectado como un comando.
+    * `m.command`: Palabra clave del comando (ej. `menu` si se escribió `.menu`).
+    * `m.args`: Argumentos del mensaje separados por espacios (sin el comando).
+    * `m.text`: Texto del mensaje sin el comando.
+    * `m.tag`: Valores extraídos de etiquetas tipo `tag=valor`.
+    * `m.plugin`: Información del plugin que se está ejecutando (si aplica).
 
-    // Identidad del Chat (Datos básicos)
-    chat: {
-        id: "1203630239293@g.us",                   // JID del chat (Grupo o Privado)
-        isGroup: true,                              // Booleano: ¿Es un grupo?
-        
-        // Métodos de gestión
-        add: [AsyncFunction],                       // Añadir participantes
-        remove: [AsyncFunction],                    // Eliminar participantes
-        settings: { lock: [Function], ... }         // Configurar grupo (solo admins)
-    },
+---
 
-    // Identidad del Remitente (Quien ejecuta el comando)
-    sender: {
-        id: "573112223333@s.whatsapp.net",          // JID del usuario
-        name: "Admin Supremo",                      // PushName de WhatsApp
-        number: "573112223333",                     // Número limpio
-        mentioned: ["573001234567@s..."],           // Lista de @menciones en el mensaje
-        
-        // Roles de Base de Datos (system:BUC)
-        roles: {
-            bot: false,                             // ¿Es el bot?
-            rowner: false,                          // ¿Es Real Owner? (Dev)
-            owner: true,                            // ¿Es Owner del Bot?
-            modr: true,                             // ¿Es Moderador del Bot?
-            prem: true                              // ¿Es usuario Premium?
-        },
-        
-        // Métodos
-        role: [AsyncFunction],                      // Verificar roles: m.sender.role('owner')
-        getPhoto: [AsyncFunction]                   // Obtener foto del usuario
-    },
+## `m.bot` (Identidad del Bot)
+Información y acciones relativas al propio Bot.
 
-    // Utilidades de Respuesta Rápida
-    reply: [AsyncFunction],                         // Responder texto: await m.reply('Hola')
-    react: [AsyncFunction],                         // Reaccionar: await m.react('✅')
-    sms: [Function],                                // Enviar mensaje de sistema: m.sms('admin')
+*   **Propiedades:**
+    *   `m.bot.name`: Nombre del bot.
+    *   `m.bot.id`: JID del bot (ej. `12345@lid`).
+    *   `m.bot.number`: Número de teléfono del bot.
+    *   `m.bot.fromMe`: Boolean. `true` si el mensaje lo envió el propio bot.
+    *   `m.bot.roles`: Objeto con los roles del bot (ej. si es admin).
 
+*   **Métodos:**
+    *   `m.bot.getDesc()`: Obtiene la info/estado del perfil del bot.
+    *   `m.bot.getPhoto()`: Obtiene la URL de la foto de perfil.
+    *   `m.bot.setPhoto(image)`: Cambia la foto de perfil.
+    *   `m.bot.setDesc(desc)`: Cambia la info/estado.
+    *   `m.bot.setName(name)`: Cambia el nombre de perfil.
+    *   `m.bot.join(link)`: Se une a un grupo mediante enlace.
+    *   `m.bot.mute(id, bool, time)`: Silencia un chat (necesita ser admin en grupos).
+    *   `m.bot.block(id, bool)`: Bloquea o desbloquea a un usuario.
+    *   `m.bot.role(rol)`: Verifica si el bot tiene un rol específico.
 
-    /* --------------------------------------------------------------------------------------
-       🛑 PUNTO DE CONTROL: Plugins 'before' (Index: 1)
-       El bot tiene datos básicos. Aún no sabe admins del grupo ni comandos.
-       Ideal para: Anti-Spam bruto, Logs de mensajes.
-       -------------------------------------------------------------------------------------- */
+---
 
+## `m.chat` (Información del Chat)
+Maneja la información del contexto donde se envió el mensaje (Grupo o Privado).
 
-    /* ======================================================================================
-       🟦 FASE 3: METADATA DE GRUPO (Solo si es Grupo)
-       Se descargan y procesan los datos pesados del grupo.
-       Archivos: m.chat.group.js
-       ====================================================================================== */
+*   **Propiedades Generales:**
+    *   `m.chat.id`: JID del chat (grupo o usuario).
+    *   `m.chat.isGroup`: Boolean. `true` si es un grupo.
+    *   `m.chat.db()`: Función para acceder a la base de datos del chat.
 
-    // Actualización del objeto Chat
-    chat: {
-        // ... (datos previos) ...
-        name: "Comunidad Anime",                    // Nombre del grupo
-        desc: "Reglas: No Gore, No Spam...",        // Descripción del grupo
-        size: 154,                                  // Cantidad de participantes
-        owner: "573009999999@s...",                 // Creador del grupo
-        participants: [ ... ],                      // Array completo de participantes
-        admins: ["573112223333@s...", ...],         // Lista de IDs de los administradores
-        metaData: { ... }                           // Metadata cruda de Baileys
-    },
+*   **Propiedades de Grupo (Solo si `isGroup` es true):**
+    *   `m.chat.name`: Nombre del grupo.
+    *   `m.chat.desc`: Descripción del grupo.
+    *   `m.chat.size`: Cantidad de participantes.
+    *   `m.chat.owner`: JID del creador del grupo.
+    *   `m.chat.admins`: Array de JIDs de los administradores.
+    *   `m.chat.participants`: Array con datos de todos los miembros.
 
-    // Actualización de Roles (Contexto de Grupo)
-    sender: {
-        // ...
-        roles: {
-            // ... (roles previos) ...
-            admin: true                             // <--- ¡NUEVO! Detectado como Admin del grupo
-        }
-    },
-    
-    bot: {
-        // ...
-        roles: {
-            admin: true                             // <--- ¡NUEVO! Sabemos si el Bot es Admin
-        }
-    },
+*   **Métodos (Principalmente Grupos):**
+    *   `m.chat.add(user)`: Añade un usuario.
+    *   `m.chat.remove(user)`: Elimina un usuario.
+    *   `m.chat.promote(user)`: Da administrador a un usuario.
+    *   `m.chat.demote(user)`: Quita administrador a un usuario.
+    *   `m.chat.setPhoto(image)`: Cambia la imagen del grupo.
+    *   `m.chat.setName(name)`: Cambia el nombre del grupo.
+    *   `m.chat.setDesc(desc)`: Cambia la descripción.
+    *   `m.chat.getLinkInvite()`: Obtiene el link de invitación.
+    *   `m.chat.revoke()`: Revoca el enlace de invitación.
+    *   `m.chat.settings.lock(bool)`: Cierra/Abre el grupo (solo admins escriben).
+    *   `m.chat.settings.announce(bool)`: Configura modo anuncios.
+    *   `m.chat.getMessage(id)`: Recupera un mensaje antiguo del historial (si está activado).
 
+---
 
-    /* --------------------------------------------------------------------------------------
-       🛑 PUNTO DE CONTROL: Plugins 'before' (Index: 2)
-       Datos completos del grupo disponibles.
-       Ideal para: Sistemas de Niveles, RPG, Gestión de Usuarios.
-       -------------------------------------------------------------------------------------- */
+## `m.sender` (Remitente)
+Información sobre quien envió el mensaje.
 
+*   **Propiedades:**
+    *   `m.sender.id`: JID del usuario.
+    *   `m.sender.name`: Nombre (PushName) o nombre en base de datos.
+    *   `m.sender.number`: Número de teléfono.
+    *   `m.sender.mentioned`: Array de JIDs mencionados en el mensaje.
+    *   `m.sender.roles`: Objeto con roles (`admin`, `rowner`, `modr`, `prem`, `banned`, etc.).
 
-    /* ======================================================================================
-       🟦 FASE 4: PARSER (Detección de Comandos)
-       Se analiza el texto buscando prefijos y comandos registrados.
-       Archivos: m.parser.js
-       ====================================================================================== */
+*   **Métodos:**
+    *   `m.sender.getDesc()`: Obtiene el estado textual del usuario.
+    *   `m.sender.getPhoto()`: Obtiene la foto de perfil.
+    *   `m.sender.role('admin', 'owner'...)`: Devuelve `true` si el usuario tiene alguno de los roles pasados.
 
-    body: ".ban @573001234567",                     // Texto final limpio
-    args: ["@573001234567"],                        // Argumentos (sin el comando)
-    text: "@573001234567",                          // Texto de argumentos unido string
-    
-    command: "ban",                                 // El comando detectado (sin prefijo)
-    isCmd: true,                                    // ¿Existe un plugin para este comando?
-    
-    // Referencia al plugin que se va a ejecutar
-    plugin: {                                       
-        case: ["ban", "kick"],
-        category: ["admin"],
-        script: [AsyncFunction]                     // La función lógica del comando
-    },
+---
 
+## `m.content` (Contenido)
+Detalles específicos sobre el contenido del mensaje.
 
-    /* --------------------------------------------------------------------------------------
-       🛑 PUNTO DE CONTROL: Plugins 'before' (Index: 3)
-       Último paso antes de ejecutar el comando.
-       Ideal para: Chatbots IA (responder si isCmd es false), Auto-Respuestas.
-       -------------------------------------------------------------------------------------- */
+*   `m.content.text`: Texto extraído (incluso de captions de imágenes).
+*   `m.content.args`: Array de palabras del texto.
+*   `m.content.media`: `false` si no hay media. Si hay media (imagen/video), es un objeto:
+    *   `mimeType`: Tipo MIME (ej. `image/jpeg`).
+    *   `fileName`: Nombre del archivo.
+    *   `download()`: **Función asíncrona** para descargar y obtener el buffer del archivo.
 
+---
 
-    /* ======================================================================================
-       🟩 FASE FINAL: EJECUCIÓN
-       Se ejecuta: await m.plugin.script(m, { sock, ... })
-       ====================================================================================== */
-}
+## `m.quoted` (Mensaje Citado)
+Si el mensaje responde a otro, este objeto existe. Si no, es `undefined` o propiedades vacías.
+
+*   `m.quoted.id`: ID del mensaje citado.
+*   `m.quoted.type`: Tipo de mensaje citado.
+*   `m.quoted.content`: Estructura idéntica a `m.content` (tiene `.text`, `.media`, `.download()`).
+*   `m.quoted.sender`: Estructura similar a `m.sender` (tiene `.id`, `.roles`, `.role()`).
+
+---
+
+## Métodos de Utilidad (Acciones Rápidas)
+Funciones inyectadas para interactuar rápidamente.
+
+| Método | Argumentos | Descripción |
+| :--- | :--- | :--- |
+| `m.reply` | `(text/object)` | Responde al mensaje actual. Soporta texto plano o un objeto de mensaje de Baileys. Menciona automáticamente si se usan `@tags`. |
+| `m.react` | `(emoji/string)` | Reacciona al mensaje. Soporta emojis directos o palabras clave: `'done'` (✔️), `'wait'` (⌛), `'error'` (✖️). |
+| `m.sms` | `(type)` | Envía mensajes predefinidos de sistema. Tipos: `'owner'`, `'group'`, `'admin'`, `'botAdmin'`, `'premium'`, etc. |
+
+---
