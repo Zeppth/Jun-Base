@@ -27,8 +27,8 @@
 
 ```bash
 # 1. Clonar o descargar el proyecto
-git clone <repositorio>
-cd SimpleBase-1.2.5
+git clone https://github.com/Zeppth/Jun-Base
+cd Jun-Base
 
 # 2. Instalar dependencias
 npm install
