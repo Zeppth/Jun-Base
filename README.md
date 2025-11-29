@@ -17,23 +17,6 @@
 
 ---
 
-## Índice
-
-1. [Instalación](#-instalación)
-2. [Inicio - QR y Pairing Code](#-inicio---qr-y-pairing-code)
-3. [Objeto `m` (Mensaje)](#-objeto-m-mensaje)
-4. [Objeto `sock` (Socket)](#-objeto-sock-socket)
-5. [Plugins](#-plugins)
-   - [Estructura de un Plugin](#estructura-de-un-plugin)
-   - [Tipos de Plugins](#tipos-de-plugins)
-     - [Command](#1-command-plugins)
-     - [Before](#2-before-plugins)
-     - [StubType](#3-stubtype-plugins)
-     - [Exports](#4-exports-plugins)
-6. [Configuración](#-configuración)
-
----
-
 ## Instalación
 
 ### Requisitos previos
