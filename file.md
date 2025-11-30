@@ -27,53 +27,42 @@ El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pi
 
 ```mermaid
 graph TD
-    %% Definición de Estilos para consistencia visual
-    classDef base fill:#fff,stroke:#333,stroke-width:1px;
-    classDef core fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef container fill:#fafafa,stroke:#999,stroke-width:1px,stroke-dasharray: 5 5;
+    %% Estilos definidos para claridad visual
+    classDef init fill:#eeeeee,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef data fill:#e3f2fd,stroke:#1565c0,stroke-width:1px;
+    classDef methods fill:#fff3e0,stroke:#ef6c00,stroke-width:1px;
+    classDef logic fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px;
 
-    %% --- INICIALIZACIÓN ---
-    subgraph Init [ ARQUITECTURA GENERAL ]
-        direction TB
-        Index[index.js] --> Fork[ForkManager <br/> process/fork]
-        Fork --> Core[core/main.js]
-        Core -.-> Baileys[Baileys Socket]
-    end
-
-    %% --- OBJETO M Y PIPELINE ---
-    subgraph HandlerPipeline [ PIPELINE DE HANDLERS ]
-        direction LR
-        note1[Construcción del Objeto m]
-        
-        MCache[m.cache] --> MBot[m.bot]
-        MBot --> MChat[m.chat]
-        MChat --> MSender[m.sender]
-        MSender --> MExt[m.***]
-    end
-
-    %% --- SISTEMA DE PLUGINS ---
-    subgraph PluginSys [ SISTEMA DE PLUGINS ]
+    %% Nodos del Pipeline
+    
+    Init([core.handler.js <br/> Estado Inicial]):::init
+    
+    subgraph Pipeline [ CONSTRUCCIÓN PROGRESIVA DEL OBJETO m ]
         direction TB
         
-        subgraph BeforeMiddleware [ Before Handlers ]
-            direction LR
-            P1[before:idx=1] --> P2[before:idx=2]
-            P2 --> P3[before:idx=3]
-        end
-
-        FinalExec[PLUGINS DE COMANDO / STUBTYPE]
+        Step1[m.cache.js <br/> + m.cache: { group, sender }]:::data
+        Step2[m.bot.js <br/> + m.bot: { id, name, roles... }]:::data
+        Step3[m.chat.js <br/> + m.chat: { id, isGroup, db... }]:::data
+        Step4[m.sender.js <br/> + m.sender: { id, name, roles... }]:::data
+        
+        Step5[m.content.js <br/> + m.content: { text, args, media } <br/> + m.quoted]:::data
+        
+        Step6[m.assign.js <br/> + m.reply, m.react, m.sms <br/> Métodos de utilidad]:::methods
+        
+        Step7[m.parser.js <br/> + m.command, m.args <br/> + m.isCmd, m.plugin]:::logic
     end
 
-    %% --- CONEXIONES ENTRE BLOQUES ---
-    Core ==> HandlerPipeline
-    HandlerPipeline ==> BeforeMiddleware
-    BeforeMiddleware ==> FinalExec
+    %% Conexiones
+    Init ==> Step1
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4
+    Step4 --> Step5
+    Step5 --> Step6
+    Step6 --> Step7
 
-    %% --- APLICACIÓN DE ESTILOS ---
-    class Index,Fork,Baileys,MCache,MBot,MChat,MSender,MExt,P1,P2,P3 base;
-    class Core,FinalExec core;
-    class HandlerPipeline,PluginSys container;
-```
+    %% Indicador final
+    Step7 -.-> Ready((Objeto m <br/> Listo)):::init
 
 ## 1.2 Estructura de Directorios
 
