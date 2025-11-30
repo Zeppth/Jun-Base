@@ -27,30 +27,30 @@ El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pi
 
 ```mermaid
 graph TD
-    %% Estilos definidos para claridad visual
+    %% Estilos
     classDef init fill:#eeeeee,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5;
     classDef data fill:#e3f2fd,stroke:#1565c0,stroke-width:1px;
     classDef methods fill:#fff3e0,stroke:#ef6c00,stroke-width:1px;
     classDef logic fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px;
 
-    %% Nodos del Pipeline
-    
-    Init([core.handler.js <br/> Estado Inicial]):::init
-    
-    subgraph Pipeline [ CONSTRUCCIÓN PROGRESIVA DEL OBJETO m ]
+    %% Nodo Inicial
+    Init(["core.handler.js <br/> Estado Inicial"]):::init
+
+    %% Grupo Principal
+    subgraph Pipeline ["CONSTRUCCIÓN PROGRESIVA DEL OBJETO m"]
         direction TB
         
-        Step1[m.cache.js <br/> + m.cache: { group, sender }]:::data
-        Step2[m.bot.js <br/> + m.bot: { id, name, roles... }]:::data
-        Step3[m.chat.js <br/> + m.chat: { id, isGroup, db... }]:::data
-        Step4[m.sender.js <br/> + m.sender: { id, name, roles... }]:::data
-        
-        Step5[m.content.js <br/> + m.content: { text, args, media } <br/> + m.quoted]:::data
-        
-        Step6[m.assign.js <br/> + m.reply, m.react, m.sms <br/> Métodos de utilidad]:::methods
-        
-        Step7[m.parser.js <br/> + m.command, m.args <br/> + m.isCmd, m.plugin]:::logic
+        Step1["m.cache.js <br/> + m.cache: { group, sender }"]:::data
+        Step2["m.bot.js <br/> + m.bot: { id, name, roles... }"]:::data
+        Step3["m.chat.js <br/> + m.chat: { id, isGroup, db... }"]:::data
+        Step4["m.sender.js <br/> + m.sender: { id, name, roles... }"]:::data
+        Step5["m.content.js <br/> + m.content: { text, args, media } <br/> + m.quoted"]:::data
+        Step6["m.assign.js <br/> + m.reply, m.react, m.sms <br/> Métodos de utilidad"]:::methods
+        Step7["m.parser.js <br/> + m.command, m.args <br/> + m.isCmd, m.plugin"]:::logic
     end
+
+    %% Nodo Final
+    Ready(("Objeto m <br/> Listo")):::init
 
     %% Conexiones
     Init ==> Step1
@@ -60,9 +60,7 @@ graph TD
     Step4 --> Step5
     Step5 --> Step6
     Step6 --> Step7
-
-    %% Indicador final
-    Step7 -.-> Ready((Objeto m <br/> Listo)):::init
+    Step7 -.-> Ready
 ```
 
 ```
