@@ -25,60 +25,62 @@
 
 El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pipeline, donde cada mensaje entrante atraviesa una cadena de handlers que construyen progresivamente un objeto de contexto unificado denominado `m`.
 
-```mermaid
-graph TD
-    %% --- ESTILOS TEMA GITHUB (Primer Design System) ---
-    %% Bases neutras
-    classDef default fill:#ffffff,stroke:#d1d5da,stroke-width:1px,color:#24292f,rx:5,ry:5;
-    
-    %% Estado Inicial (Gris/Dashed)
-    classDef init fill:#f6f8fa,stroke:#6e7781,stroke-width:1px,stroke-dasharray: 4 4;
-    
-    %% Módulos de Datos (Borde Azul GitHub)
-    classDef data stroke:#0969da,stroke-width:1px,fill:#ffffff;
-    
-    %% Módulos de Métodos (Borde Morado GitHub)
-    classDef methods stroke:#8250df,stroke-width:1px,fill:#ffffff;
-    
-    %% Lógica/Parser (Borde Naranja GitHub)
-    classDef logic stroke:#bf8700,stroke-width:1px,fill:#ffffff;
-    
-    %% Final (Borde Verde Éxito)
-    classDef final stroke:#1a7f37,stroke-width:2px,fill:#f6f8fa;
-
-    %% --- NODOS ---
-
-    Init(["core.handler.js <br/> Estado Inicial"]):::init
-
-    subgraph Pipeline ["CONSTRUCCIÓN PROGRESIVA DEL OBJETO m"]
-        direction TB
-        
-        Step1["m.cache.js <br/> <b>+ m.cache</b>: { group, sender }"]:::data
-        Step2["m.bot.js <br/> <b>+ m.bot</b>: { id, name, roles... }"]:::data
-        Step3["m.chat.js <br/> <b>+ m.chat</b>: { id, isGroup, db... }"]:::data
-        Step4["m.sender.js <br/> <b>+ m.sender</b>: { id, name, roles... }"]:::data
-        
-        Step5["m.content.js <br/> <b>+ m.content</b>: { text, media } <br/> <b>+ m.quoted</b>"]:::data
-        
-        Step6["m.assign.js <br/> <b>+ m.reply, m.react, m.sms</b> <br/> Métodos de utilidad"]:::methods
-        
-        Step7["m.parser.js <br/> <b>+ m.command, m.args</b> <br/> <b>+ m.isCmd, m.plugin</b>"]:::logic
-    end
-
-    Ready(("Objeto m <br/> Listo")):::final
-
-    %% --- CONEXIONES ---
-    Init ==> Step1
-    Step1 --> Step2
-    Step2 --> Step3
-    Step3 --> Step4
-    Step4 --> Step5
-    Step5 --> Step6
-    Step6 --> Step7
-    Step7 -.-> Ready
-    
-    %% Estilo del link (Gris suave)
-    linkStyle default stroke:#57606a,stroke-width:1px;
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CONSTRUCCIÓN PROGRESIVA DEL OBJETO m                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────┐                                                        │
+│  │ m = { id }  │  ◄── Estado inicial (core.handler.js)                  │
+│  └──────┬──────┘                                                        │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.cache.js                              │                            │
+│  │  └── m.cache = { group: {}, sender: {} }│                            │
+│  └──────┬──────────────────────────────────┘                            │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.bot.js                                │                            │
+│  │  └── m.bot = { id, name, roles, ... }   │                            │
+│  └──────┬──────────────────────────────────┘                            │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.chat.js                               │                            │
+│  │  └── m.chat = { id, isGroup, db(), ...} │                            │
+│  └──────┬──────────────────────────────────┘                            │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.sender.js                             │                            │
+│  │  └── m.sender = { id, name, roles, ...} │                            │
+│  └──────┬──────────────────────────────────┘                            │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.content.js                            │                            │
+│  │  └── m.content = { text, args, media }  │                            │
+│  │  └── m.quoted = { ... } (si existe)     │                            │
+│  └──────┬──────────────────────────────────┘                            │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.assign.js                             │                            │
+│  │  └── m.reply = async (text) => ...      │                            │
+│  │  └── m.react = async (text) => ...      │                            │
+│  │  └── m.sms = (type) => ...              │                            │
+│  └──────┬──────────────────────────────────┘                            │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────┐                            │
+│  │ m.parser.js                             │                            │
+│  │  └── m.command, m.args, m.text          │                            │
+│  │  └── m.isCmd, m.plugin                  │                            │
+│  └─────────────────────────────────────────┘                            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ```
