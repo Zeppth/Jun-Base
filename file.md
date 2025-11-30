@@ -27,32 +27,47 @@ El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pi
 
 ```mermaid
 graph TD
-    %% Estilos
-    classDef init fill:#eeeeee,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5;
-    classDef data fill:#e3f2fd,stroke:#1565c0,stroke-width:1px;
-    classDef methods fill:#fff3e0,stroke:#ef6c00,stroke-width:1px;
-    classDef logic fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px;
+    %% --- ESTILOS TEMA GITHUB (Primer Design System) ---
+    %% Bases neutras
+    classDef default fill:#ffffff,stroke:#d1d5da,stroke-width:1px,color:#24292f,rx:5,ry:5;
+    
+    %% Estado Inicial (Gris/Dashed)
+    classDef init fill:#f6f8fa,stroke:#6e7781,stroke-width:1px,stroke-dasharray: 4 4;
+    
+    %% Módulos de Datos (Borde Azul GitHub)
+    classDef data stroke:#0969da,stroke-width:1px,fill:#ffffff;
+    
+    %% Módulos de Métodos (Borde Morado GitHub)
+    classDef methods stroke:#8250df,stroke-width:1px,fill:#ffffff;
+    
+    %% Lógica/Parser (Borde Naranja GitHub)
+    classDef logic stroke:#bf8700,stroke-width:1px,fill:#ffffff;
+    
+    %% Final (Borde Verde Éxito)
+    classDef final stroke:#1a7f37,stroke-width:2px,fill:#f6f8fa;
 
-    %% Nodo Inicial
+    %% --- NODOS ---
+
     Init(["core.handler.js <br/> Estado Inicial"]):::init
 
-    %% Grupo Principal
     subgraph Pipeline ["CONSTRUCCIÓN PROGRESIVA DEL OBJETO m"]
         direction TB
         
-        Step1["m.cache.js <br/> + m.cache: { group, sender }"]:::data
-        Step2["m.bot.js <br/> + m.bot: { id, name, roles... }"]:::data
-        Step3["m.chat.js <br/> + m.chat: { id, isGroup, db... }"]:::data
-        Step4["m.sender.js <br/> + m.sender: { id, name, roles... }"]:::data
-        Step5["m.content.js <br/> + m.content: { text, args, media } <br/> + m.quoted"]:::data
-        Step6["m.assign.js <br/> + m.reply, m.react, m.sms <br/> Métodos de utilidad"]:::methods
-        Step7["m.parser.js <br/> + m.command, m.args <br/> + m.isCmd, m.plugin"]:::logic
+        Step1["m.cache.js <br/> <b>+ m.cache</b>: { group, sender }"]:::data
+        Step2["m.bot.js <br/> <b>+ m.bot</b>: { id, name, roles... }"]:::data
+        Step3["m.chat.js <br/> <b>+ m.chat</b>: { id, isGroup, db... }"]:::data
+        Step4["m.sender.js <br/> <b>+ m.sender</b>: { id, name, roles... }"]:::data
+        
+        Step5["m.content.js <br/> <b>+ m.content</b>: { text, media } <br/> <b>+ m.quoted</b>"]:::data
+        
+        Step6["m.assign.js <br/> <b>+ m.reply, m.react, m.sms</b> <br/> Métodos de utilidad"]:::methods
+        
+        Step7["m.parser.js <br/> <b>+ m.command, m.args</b> <br/> <b>+ m.isCmd, m.plugin</b>"]:::logic
     end
 
-    %% Nodo Final
-    Ready(("Objeto m <br/> Listo")):::init
+    Ready(("Objeto m <br/> Listo")):::final
 
-    %% Conexiones
+    %% --- CONEXIONES ---
     Init ==> Step1
     Step1 --> Step2
     Step2 --> Step3
@@ -61,6 +76,9 @@ graph TD
     Step5 --> Step6
     Step6 --> Step7
     Step7 -.-> Ready
+    
+    %% Estilo del link (Gris suave)
+    linkStyle default stroke:#57606a,stroke-width:1px;
 ```
 
 ```
