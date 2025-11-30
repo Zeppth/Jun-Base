@@ -14,7 +14,7 @@ export default async ({ m, sock }) => {
     m.args = m.body.trim().split(/ +/).slice(1)
     m.text = m.args.length > 0 ? m.args.join(" ") : m.body;
 
-    const Prefix = global.settings.mainBotPrefix;
+    const Prefix = global.config.prefixes;
     
     if (Prefix && Prefix.includes(m.body[0])) {
 

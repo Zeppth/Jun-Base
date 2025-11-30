@@ -1,16 +1,10 @@
 // ./core/handlers/m.content.js
+import handlerLoader from '../../library/loader.js';
 
 export default async ({ m, sock, message }) => {
-    const messageExtractors = {
-        'conversation': (message) => message.message.conversation || '',
-        'imageMessage': (message) => message.message.imageMessage.caption || '',
-        'videoMessage': (message) => message.message.videoMessage.caption || '',
-        'extendedTextMessage': (message) => message.message.extendedTextMessage.text || '',
-        'buttonsResponseMessage': (message) => message.message.buttonsResponseMessage.selectedButtonId || '',
-        'templateButtonReplyMessage': (message) => message.message.templateButtonReplyMessage.selectedId || '',
-        'interactiveResponseMessage': (message) => message.message.interactiveResponseMessage ? (JSON.parse(message
-            .interactiveResponseMessage.nativeFlowResponseMessage.paramsJson)).id || '' : '',
-    }
+    const extrator = handlerLoader.get('[+] extrator.content.js');
+    const messageExtractors = extrator.default
+
     /// MESSAGE
 
     m.type = (() => {

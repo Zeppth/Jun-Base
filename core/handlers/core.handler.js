@@ -67,7 +67,7 @@ export default async (messages, sock) => {
         }
 
         //LEER MENSAJE DESDE EL BOT
-        if (!sock.subBot && global.settings['mainBotAuto-read'])
+        if (!sock.subBot && global.config.autoRead)
             await sock.readMessages([message.key])
 
         // chat grupo

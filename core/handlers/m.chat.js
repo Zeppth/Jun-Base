@@ -67,21 +67,9 @@ export default async ({ m, sock, cached, message }) => {
     }
 
     try {
-        if (global.settings.mainBotStore) {
-            m.chat.getMessage = async (id) => {
-                const chat = await global.db.open(
-                    '@history/' + m.chat.id
-                )
-                if (!chat.data) chat.data = {}
-                const senderId = chat.data[id]
-                if (!senderId) return null
-
-                const sender = await global.db.open(
-                    '@history/' + m.chat.id + '/' + senderId
-                )
-                if (!Array.isArray(sender.data)) sender.data = []
-                return sender.data.find(m => m.key.id === id)
-            }
+        if (global.config.saveHistory) {
+            m.chat.loadMessage = (id) =>
+                sock.loadMessage(m.chat.id, id)
         }
     } catch (e) {
         console.error(e)

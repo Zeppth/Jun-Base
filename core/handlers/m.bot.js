@@ -5,7 +5,7 @@ export default ({ m, sock, cached, message }) => {
     m.bot.roles = {}
     m.bot.name = sock.user.name || '';
     m.bot.id = sock.user.lid.includes(':') ? (sock.user.lid.split(":")[0] + "@lid") : sock.user.lid;
-    m.bot.number = m.bot.id?.split('@')[0] || undefined;
+    m.bot.user = '@' + m.bot.id?.split('@')[0] || undefined;
     m.bot.fromMe = message.key.fromMe;
 
     m.bot.getDesc = async () => await cached.sender.desc(m.bot.id);

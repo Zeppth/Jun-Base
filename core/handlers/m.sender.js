@@ -1,7 +1,7 @@
 // ./core/handlers/m.sender.js
 
 import $base from '../../library/db.js';
-const userRoles = global.settings.SetUserRoles
+const userRoles = global.config.userRoles
 
 export default async ({ m, cached, message, contextInfo }) => {
     m.sender = m.sender || {}
@@ -19,7 +19,7 @@ export default async ({ m, cached, message, contextInfo }) => {
     }
 
     m.sender.name = m.bot.fromMe ? m.bot.name : message.pushName || '';
-    m.sender.number = (m.sender.id)?.split('@')[0] || undefined;
+    m.sender.user = '@' + m.sender.id?.split('@')[0] || undefined;
     m.sender.roles.bot = m.bot.id === m.sender.id;
 
     m.sender.getDesc = async () => await cached.sender.desc(m.sender.id);
@@ -34,14 +34,10 @@ export default async ({ m, cached, message, contextInfo }) => {
     const users = db.data
 
     const rol = {
-        rowner: m.sender.roles.bot ? true
-            : roles?.rowner || false,
-        owner: m.sender.roles.bot ? true
-            : roles?.owner || false,
-        modr: m.sender.roles.bot ? true
-            : roles?.modr || false,
-        prem: m.sender.roles.bot ? true
-            : roles?.prem || false,
+        root: m.sender.roles.bot ? true : roles?.root || false,
+        owner: m.sender.roles.bot ? true : roles?.owner || false,
+        mod: m.sender.roles.bot ? true : roles?.mod || false,
+        vip: m.sender.roles.bot ? true : roles?.vip || false,
     }
 
     if (!users[m.sender.id]) {
@@ -84,7 +80,7 @@ export default async ({ m, cached, message, contextInfo }) => {
     try {
         if (
             m.message?.message
-            && global.settings.mainBotStore
+            && global.config.saveHistory
             && m.chat.isGroup) {
 
             const chat = await global.db.open(
