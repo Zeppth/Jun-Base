@@ -25,63 +25,23 @@
 
 El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pipeline, donde cada mensaje entrante atraviesa una cadena de handlers que construyen progresivamente un objeto de contexto unificado denominado `m`.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    CONSTRUCCIÓN PROGRESIVA DEL OBJETO m                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────┐                                                        │
-│  │ m = { id }  │  ◄── Estado inicial (core.handler.js)                  │
-│  └──────┬──────┘                                                        │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.cache.js                              │                            │
-│  │  └── m.cache = { group: {}, sender: {} }│                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.bot.js                                │                            │
-│  │  └── m.bot = { id, name, roles, ... }   │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.chat.js                               │                            │
-│  │  └── m.chat = { id, isGroup, db(), ...} │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.sender.js                             │                            │
-│  │  └── m.sender = { id, name, roles, ...} │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.content.js                            │                            │
-│  │  └── m.content = { text, args, media }  │                            │
-│  │  └── m.quoted = { ... } (si existe)     │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.assign.js                             │                            │
-│  │  └── m.reply = async (text) => ...      │                            │
-│  │  └── m.react = async (text) => ...      │                            │
-│  │  └── m.sms = (type) => ...              │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.parser.js                             │                            │
-│  │  └── m.command, m.args, m.text          │                            │
-│  │  └── m.isCmd, m.plugin                  │                            │
-│  └─────────────────────────────────────────┘                            │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+1. INICIO (core.handler.js)
+   └── m = { id }
+
+2. CAPA DE DATOS
+   ├── m.cache.js   ➔ Inyecta: m.cache { group, sender }
+   ├── m.bot.js     ➔ Inyecta: m.bot { id, name, roles }
+   ├── m.chat.js    ➔ Inyecta: m.chat { id, isGroup, db }
+   └── m.sender.js  ➔ Inyecta: m.sender { id, name, roles }
+
+3. CAPA DE CONTENIDO
+   └── m.content.js ➔ Inyecta: m.content { text, args, media } y m.quoted
+
+4. CAPA DE UTILIDADES
+   └── m.assign.js  ➔ Inyecta métodos: m.reply(), m.react(), m.sms()
+
+5. CAPA DE ANÁLISIS (PARSER)
+   └── m.parser.js  ➔ Define: m.command, m.args, m.isCmd, m.plugin
 
 ```
 @SimpleBase/
