@@ -1,9 +1,8 @@
-# Documentación Técnica Oficial
-## La Base — Sistema Modular para Automatización de Mensajería
+# Jun-Base
 
-**Versión**: 1.2.5
+SimpleBase de WhatsApp utilizando Baileys.
+
 **Autor**: Zeppth
-**Licencia**: Propietaria
 
 ---
 
@@ -25,26 +24,23 @@
 
 El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pipeline, donde cada mensaje entrante atraviesa una cadena de handlers que construyen progresivamente un objeto de contexto unificado denominado `m`.
 
-1. INICIO (core.handler.js)
-   └── m = { id }
+**Arquitectura del Sistema:**
 
-2. CAPA DE DATOS
-   ├── m.cache.js   ➔ Inyecta: m.cache { group, sender }
-   ├── m.bot.js     ➔ Inyecta: m.bot { id, name, roles }
-   ├── m.chat.js    ➔ Inyecta: m.chat { id, isGroup, db }
-   └── m.sender.js  ➔ Inyecta: m.sender { id, name, roles }
+```javascript
+// 1. Nivel de Infraestructura (Arranque y Conexión)
+index.js ➔ ForkManager ➔ core/main.js ➔ Baileys Socket
 
-3. CAPA DE CONTENIDO
-   └── m.content.js ➔ Inyecta: m.content { text, args, media } y m.quoted
+// 2. Nivel de Procesamiento (Pipeline de Handlers)
+Evento Entrante ➔ [m.cache ➔ m.bot ➔ m.chat ➔ m.sender ➔ ...] ➔ Contexto `m`
 
-4. CAPA DE UTILIDADES
-   └── m.assign.js  ➔ Inyecta métodos: m.reply(), m.react(), m.sms()
+// 3. Nivel de Aplicación (Sistema de Plugins)
+Contexto `m` ➔ Plugins `before` (Middleware) ➔ Resolución de Comando / StubType
+```
 
-5. CAPA DE ANÁLISIS (PARSER)
-   └── m.parser.js  ➔ Define: m.command, m.args, m.isCmd, m.plugin
+## 1.2 Estructura de Directorios
 
 ```
-@SimpleBase/
+Jun-Base/
 ├── index.js                 # Punto de entrada principal
 ├── config.js                # Configuración global
 ├── package.json
@@ -125,62 +121,17 @@ El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pi
 
 El objeto `m` constituye el contexto unificado de mensaje. No es un DTO estático, sino un objeto mutable que se enriquece progresivamente a través del pipeline de handlers. Cada handler añade propiedades y métodos específicos a su dominio.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    CONSTRUCCIÓN PROGRESIVA DEL OBJETO m                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────┐                                                        │
-│  │ m = { id }  │  ◄── Estado inicial (core.handler.js)                  │
-│  └──────┬──────┘                                                        │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.cache.js                              │                            │
-│  │  └── m.cache = { group: {}, sender: {} }│                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.bot.js                                │                            │
-│  │  └── m.bot = { id, name, roles, ... }   │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.chat.js                               │                            │
-│  │  └── m.chat = { id, isGroup, db(), ...} │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.sender.js                             │                            │
-│  │  └── m.sender = { id, name, roles, ...} │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.content.js                            │                            │
-│  │  └── m.content = { text, args, media }  │                            │
-│  │  └── m.quoted = { ... } (si existe)     │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.assign.js                             │                            │
-│  │  └── m.reply = async (text) => ...      │                            │
-│  │  └── m.react = async (text) => ...      │                            │
-│  │  └── m.sms = (type) => ...              │                            │
-│  └──────┬──────────────────────────────────┘                            │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────┐                            │
-│  │ m.parser.js                             │                            │
-│  │  └── m.command, m.args, m.text          │                            │
-│  │  └── m.isCmd, m.plugin                  │                            │
-│  └─────────────────────────────────────────┘                            │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+**Flujo de Construcción:**
+
+```javascript
+1. core.handler.js  -> m = { id }                        // Estado Inicial
+2. m.cache.js       -> m.cache = { group, sender }       // Capa de Caché
+3. m.bot.js         -> m.bot = { id, name, ... }         // Identidad del Bot
+4. m.chat.js        -> m.chat = { id, isGroup, db... }   // Contexto del Chat
+5. m.sender.js      -> m.sender = { id, roles... }       // Datos del Emisor
+6. m.content.js     -> m.content, m.quoted               // Proceso de Mensaje/Citas
+7. m.assign.js      -> m.reply(), m.react()              // Inyección de Métodos
+8. m.parser.js      -> m.command, m.args, m.isCmd        // Lógica de Comandos
 ```
 
 ## 2.2 Esquema Tipado Completo
@@ -440,38 +391,38 @@ export default {
 El Núcleo reconoce tres categorías de plugins según sus propiedades declarativas:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         TAXONOMÍA DE PLUGINS                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │ 1. PLUGINS DE COMANDO                                          │    │
-│  │    command: true                                               │    │
-│  │    case: String | Array<String>                                │    │
-│  │    usePrefix: Boolean (default: true)                          │    │
-│  │                                                                 │    │
-│  │    Se activan cuando m.command coincide con case               │    │
-│  └────────────────────────────────────────────────────────────────┘    │
-│                                                                         │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │ 2. PLUGINS DE INTERCEPTACIÓN (BEFORE)                          │    │
-│  │    before: true                                                │    │
-│  │    index: 1 | 2 | 3                                            │    │
-│  │                                                                 │    │
-│  │    Se ejecutan en puntos específicos del pipeline              │    │
-│  │    Pueden interrumpir el flujo con control.end = true          │    │
-│  └────────────────────────────────────────────────────────────────┘    │
-│                                                                         │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │ 3. PLUGINS DE EVENTO (STUBTYPE)                                │    │
-│  │    stubtype: true                                              │    │
-│  │    case: String (nombre del evento WebMessageInfo.StubType)    │    │
-│  │                                                                 │    │
-│  │    Se activan con eventos del protocolo WhatsApp               │    │
-│  │    Ejemplos: GROUP_PARTICIPANT_ADD, GROUP_PARTICIPANT_LEAVE    │    │
-│  └────────────────────────────────────────────────────────────────┘    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         TAXONOMÍA DE PLUGINS                         │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ 1. PLUGINS DE COMANDO                                          │  │
+│  │    command: true                                               │  │
+│  │    case: String | Array<String>                                │  │
+│  │    usePrefix: Boolean (default: true)                          │  │
+│  │                                                                │  │
+│  │    Se activan cuando m.command coincide con case               │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ 2. PLUGINS DE INTERCEPTACIÓN (BEFORE)                          │  │
+│  │    before: true                                                │  │
+│  │    index: 1 | 2 | 3                                            │  │
+│  │                                                                │  │
+│  │    Se ejecutan en puntos específicos del pipeline              │  │
+│  │    Pueden interrumpir el flujo con control.end = true          │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ 3. PLUGINS DE EVENTO (STUBTYPE)                                │  │
+│  │    stubtype: true                                              │  │
+│  │    case: String (nombre del evento WebMessageInfo.StubType)    │  │
+│  │                                                                │  │
+│  │    Se activan con eventos del protocolo WhatsApp               │  │
+│  │    Ejemplos: GROUP_PARTICIPANT_ADD, GROUP_PARTICIPANT_LEAVE    │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 3.2 Anatomía de un Plugin
@@ -532,45 +483,45 @@ Para plugins `stubtype`, el contexto incluye propiedades adicionales:
 ## 3.3 Ciclo de Vida de Plugins
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     CICLO DE VIDA DE UN PLUGIN                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────┐                                                        │
-│  │   CARGA     │  Plugins.load() → fs.readdir() → import()              │
-│  │  INICIAL    │  Se almacena en Map con fileName como key              │
-│  └──────┬──────┘                                                        │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────┐                                                        │
-│  │  REGISTRO   │  Se parsean propiedades (case, command, etc.)          │
-│  │   EN MAP    │  Se mezclan con defaultObjects del constructor         │
-│  └──────┬──────┘                                                        │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────┐                                                        │
-│  │ OBSERVACIÓN │  chokidar.watch() monitorea cambios                    │
-│  │  (WATCHER)  │  Eventos: add, change, unlink                          │
-│  └──────┬──────┘                                                        │
-│         │                                                               │
-│         ├──────────────────────┐                                        │
-│         │                      │                                        │
-│         ▼                      ▼                                        │
-│  ┌─────────────┐        ┌─────────────┐                                 │
-│  │   CAMBIO    │        │ ELIMINACIÓN │                                 │
-│  │  (change)   │        │  (unlink)   │                                 │
-│  │             │        │             │                                 │
-│  │ delete(key) │        │ delete(key) │                                 │
-│  │ reimport()  │        │             │                                 │
-│  └─────────────┘        └─────────────┘                                 │
-│                                                                         │
+┌────────────────────────────────────────────────────────────────────────┐
+│                     CICLO DE VIDA DE UN PLUGIN                         │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  ┌─────────────┐                                                       │
+│  │   CARGA     │  Plugins.load() → fs.readdir() → import()             │
+│  │  INICIAL    │  Se almacena en Map con fileName como key             │
+│  └──────┬──────┘                                                       │
+│         │                                                              │
+│         ▼                                                              │
+│  ┌─────────────┐                                                       │
+│  │  REGISTRO   │  Se parsean propiedades (case, command, etc.)         │
+│  │   EN MAP    │  Se mezclan con defaultObjects del constructor        │
+│  └──────┬──────┘                                                       │
+│         │                                                              │
+│         ▼                                                              │
+│  ┌─────────────┐                                                       │
+│  │ OBSERVACIÓN │  chokidar.watch() monitorea cambios                   │
+│  │  (WATCHER)  │  Eventos: add, change, unlink                         │
+│  └──────┬──────┘                                                       │
+│         │                                                              │
+│         ├──────────────────────┐                                       │
+│         │                      │                                       │
+│         ▼                      ▼                                       │
+│  ┌─────────────┐        ┌─────────────┐                                │
+│  │   CAMBIO    │        │ ELIMINACIÓN │                                │
+│  │  (change)   │        │  (unlink)   │                                │
+│  │             │        │             │                                │
+│  │ delete(key) │        │ delete(key) │                                │
+│  │ reimport()  │        │             │                                │
+│  └─────────────┘        └─────────────┘                                │
+│                                                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                         EJECUCIÓN                                │   │
-│  │                                                                   │   │
+│  │                         EJECUCIÓN                               │   │
+│  │                                                                 │   │
 │  │  messages.upsert → core.handler → plugins.get(query) → script() │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 3.4 Sistema de Consulta de Plugins
@@ -741,34 +692,34 @@ El sistema de persistencia implementa un almacén JSON con las siguientes caract
 - Escritura diferida (lazy write)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                       SISTEMA DE PERSISTENCIA                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
+┌────────────────────────────────────────────────────────────────────────┐
+│                       SISTEMA DE PERSISTENCIA                          │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                         MEMORIA                                  │   │
+│  │                         MEMORIA                                 │   │
 │  │  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     │   │
 │  │  │  $data.bases │     │$data.timeouts│     │ $data.index  │     │   │
 │  │  │    (Map)     │     │    (Map)     │     │   (Object)   │     │   │
 │  │  └──────┬───────┘     └──────┬───────┘     └──────┬───────┘     │   │
 │  │         │                    │                    │             │   │
 │  └─────────┼────────────────────┼────────────────────┼─────────────┘   │
-│            │                    │                    │                  │
-│            │         TTL: 60s   │                    │                  │
-│            │         ┌──────────┘                    │                  │
-│            │         │                               │                  │
-│            ▼         ▼                               ▼                  │
+│            │                    │                    │                 │
+│            │         TTL: 60s   │                    │                 │
+│            │         ┌──────────┘                    │                 │
+│            │         │                               │                 │
+│            ▼         ▼                               ▼                 │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      SISTEMA DE ARCHIVOS                         │   │
-│  │                                                                   │   │
-│  │  storage/store/                                                  │   │
-│  │  ├── index.json          { "@users": { "id": "A1B2" }, ... }     │   │
-│  │  ├── A1B2.json           { "user1": { ... }, "user2": { ... } }  │   │
-│  │  ├── C3D4.json           { ... }                                 │   │
-│  │  └── ...                                                          │   │
+│  │                      SISTEMA DE ARCHIVOS                        │   │
+│  │                                                                 │   │
+│  │  storage/store/                                                 │   │
+│  │  ├── index.json          { "@users": { "id": "A1B2" }, ... }    │   │
+│  │  ├── A1B2.json           { "user1": { ... }, "user2": { ... } } │   │
+│  │  ├── C3D4.json           { ... }                                │   │
+│  │  └── ...                                                        │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 4.2 API del Sistema de Persistencia
@@ -853,38 +804,23 @@ El Núcleo utiliza convenciones de nomenclatura para bases de datos internas:
 
 ## 5.1 Arquitectura Multi-Proceso
 
-El Núcleo implementa una arquitectura de proceso padre-hijo para aislar el bot principal:
+El Núcleo implementa una arquitectura de proceso padre-hijo para aislar la lógica del bot de la gestión del proceso, garantizando estabilidad ante fallos críticos.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     ARQUITECTURA DE PROCESOS                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │                    PROCESO PADRE (index.js)                     │    │
-│  │                                                                  │    │
-│  │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │    │
-│  │  │ ForkManager │────▶│   Events    │────▶│   Console   │       │    │
-│  │  │             │     │  Handlers   │     │   Output    │       │    │
-│  │  └──────┬──────┘     └─────────────┘     └─────────────┘       │    │
-│  │         │                                                       │    │
-│  └─────────┼───────────────────────────────────────────────────────┘    │
-│            │                                                             │
-│            │ fork() + IPC                                                │
-│            │                                                             │
-│  ┌─────────▼───────────────────────────────────────────────────────┐    │
-│  │                   PROCESO HIJO (core/index.js)                   │    │
-│  │                                                                   │    │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐            │    │
-│  │  │ Baileys │  │ Plugins │  │   DB    │  │ Handlers│            │    │
-│  │  │  Socket │  │  System │  │  System │  │ Pipeline│            │    │
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘            │    │
-│  │                                                                   │    │
-│  └───────────────────────────────────────────────────────────────────┘    │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+```javascript
+// 1. PROCESO PADRE (index.js) [Supervisor]
+// Rol: Gestión de ciclo de vida, logs y recuperación de errores.
+Components: ForkManager, IPC Listeners, Console Output.
 
+      ⬇ fork() + Canal IPC (Inter-Process Communication)
+
+// 2. PROCESO HIJO (core/index.js) [Worker]
+// Rol: Ejecución de lógica de negocio, conexión y estado.
+Components: 
+  ├── Baileys Socket (Conexión WhatsApp)
+  ├── Plugins System (Comandos y Eventos)
+  ├── DB System      (Persistencia)
+  └── Handlers       (Pipeline de mensajes)
+```
 ## 5.2 Comunicación Inter-Proceso (IPC)
 
 ### 5.2.1 Envío de Mensajes desde Proceso Hijo
@@ -1389,9 +1325,6 @@ sock.setReplyHandler(
 
 // Cargar mensaje del historial
 sock.loadMessage(jid: String, messageId: String) => Promise<Object | null>
-
-// Acceso a Baileys
-sock.Baileys() => Promise<BaileysModule>
 ```
 
 ## 7.2 Clase Plugins
@@ -1556,8 +1489,3 @@ Lista parcial de eventos de `WebMessageInfo.StubType` que pueden capturarse con 
 | `global.readMore` | String | Carácter invisible para "leer más" |
 
 ---
-
-**Fin del Documento**
-
-*Versión de documentación: 1.0.0*
-*Generada para SimpleBase 1.2.5*
