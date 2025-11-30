@@ -63,8 +63,7 @@ graph TD
 
     %% Indicador final
     Step7 -.-> Ready((Objeto m <br/> Listo)):::init
-
-## 1.2 Estructura de Directorios
+```
 
 ```
 @SimpleBase/
