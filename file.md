@@ -66,12 +66,12 @@ Jun-Base/
 │       └── [+] extrator.content.js # Extractores por tipo
 │
 ├── library/
-│   ├── client.js            # Fábrica del cliente WhatsApp
+│   ├── client.js            # cliente WhatsApp
 │   ├── plugins.js           # Gestor de plugins
 │   ├── db.js                # Sistema de persistencia JSON
 │   ├── fork.js              # Gestión de procesos hijo
 │   ├── bind.js              # Extensiones del socket
-│   ├── loader.js            # Cargador de handlers con hot-reload
+│   ├── loader.js            # Cargador de handlers
 │   ├── process.js           # Abstracción de IPC
 │   ├── log.js               # Sistema de logging
 │   ├── purge.js             # Limpieza de temporales
@@ -1186,13 +1186,13 @@ export default {
                 {
                     priority: 1,
                     code: {
-                        guard: `(m, ctx) => {
+                        guard: (m, ctx) => {
                             const seleccion = parseInt(m.content.text);
                             return isNaN(seleccion) || 
                                    seleccion < 1 || 
                                    seleccion > ctx.state.catalogo.length;
-                        }`,
-                        executor: `async (m, ctx) => {
+                        },
+                        executor: async (m, ctx) => {
                             const seleccion = parseInt(m.content.text) - 1;
                             const item = ctx.state.catalogo[seleccion];
                             
@@ -1215,7 +1215,7 @@ export default {
                                 'Compra exitosa: ' + item.nombre + 
                                 '\\nNuevo balance: ' + cuenta.balance
                             );
-                        }`
+                        }
                     }
                 }
             ]
