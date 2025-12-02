@@ -2,10 +2,6 @@
 
 SimpleBase de WhatsApp utilizando Baileys.
 
-**Autor**: Zeppth
-
----
-
 # Tabla de Contenidos
 
 1. [Introducción Arquitectónica](#1-introducción-arquitectónica)
@@ -159,7 +155,6 @@ El archivo `core/format.js` define el contrato estructural del objeto `m`. A con
 m.bot = {
     id: String,           // JID del bot (formato @lid)
     name: String,         // Nombre del perfil
-    number: String,       // Número sin dominio
     fromMe: Boolean,      // true si el mensaje proviene del bot
     
     roles: {
@@ -224,7 +219,6 @@ m.chat = {
 m.sender = {
     id: String,           // JID del remitente
     name: String,         // pushName o nombre almacenado
-    number: String,       // Número sin dominio
     user: String,         // Formato @número
     mentioned: Array<String>, // JIDs mencionados
     
@@ -270,7 +264,6 @@ m.quoted = {
     sender: {
         id: String,
         name: String,
-        number: String,
         roles: { ... },   // Misma estructura que m.sender.roles
         getDesc: async () => String,
         getPhoto: async () => String,
@@ -530,20 +523,20 @@ El método `plugins.get()` acepta un objeto de consulta que filtra plugins segú
 
 ```javascript
 // Obtener plugins de comando que coincidan con "help"
-const plugins = await sock.plugins.get({
+const plugins = await sock.plugins.query({
     case: 'help',
     command: true,
     usePrefix: true
 });
 
 // Obtener plugins before con index 2
-const beforePlugins = await sock.plugins.get({
+const beforePlugins = await sock.plugins.query({
     before: true,
     index: 2
 });
 
 // Obtener plugin de evento específico
-const eventPlugin = await sock.plugins.get({
+const eventPlugin = await sock.plugins.query({
     case: 'GROUP_PARTICIPANT_ADD',
     stubtype: true
 });
