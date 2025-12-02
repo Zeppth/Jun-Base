@@ -21,7 +21,7 @@ export default async ({ m, sock }) => {
         m.command = m.body.substring(1).trim()
             .split(/ +/)[0].toLowerCase()
 
-        const plugin = await sock.plugins.get({
+        const plugin = await sock.plugins.query({
             case: m.command,
             usePrefix: true,
             command: true,
@@ -34,7 +34,7 @@ export default async ({ m, sock }) => {
             m.command = m.body.trim()
                 .split(/ +/)[0].toLowerCase()
 
-            const plugin = await sock.plugins.get({
+            const plugin = await sock.plugins.query({
                 case: m.command,
                 usePrefix: false,
                 command: true,
@@ -45,7 +45,7 @@ export default async ({ m, sock }) => {
     } else {
         m.command = m.body.trim()
             .split(/ +/)[0].toLowerCase()
-        const plugin = await sock.plugins.get({
+        const plugin = await sock.plugins.query({
             case: m.command,
             command: true
         })

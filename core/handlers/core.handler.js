@@ -49,9 +49,16 @@ export default async (messages, sock) => {
         // index: 1
         try {
             let control = { end: false };
-            const plugins = await sock.plugins.get({
+            const plugins = await sock.plugins.query({
                 before: true, index: 1
             });
+
+            plugins.sort((a, b) => {
+                const priorityA = a.priority ?? Infinity;
+                const priorityB = b.priority ?? Infinity;
+                return priorityA - priorityB;
+            });
+
             for (let plugin of plugins) {
                 if (control.end) break;
                 await plugin.script(m, {
@@ -66,9 +73,21 @@ export default async (messages, sock) => {
             $console.error(e);
         }
 
-        //LEER MENSAJE DESDE EL BOT
+        // ------
         if (!sock.subBot && global.config.autoRead)
-            await sock.readMessages([message.key])
+            await sock.readMessages([message.key]);
+
+        /*Banned*/ {
+            const user = m.sender.role(
+                'root', 'owner', 'mod', 'bot'
+            )
+
+            const chat_db = await m.chat.db()
+            if (chat_db.data.banned && !user) continue;
+
+            const user_db = await m.sender.db()
+            if (user_db.data.banned && !user) continue;
+        }
 
         // chat grupo
         if (m.chat.isGroup) await m_ChatGroup.default({ m, sock, cached })
@@ -91,7 +110,7 @@ export default async (messages, sock) => {
             const even = $proto?.WebMessageInfo?.StubType
             const evento = Object.keys(even).find(key =>
                 even[key] === message.messageStubType)
-            const plugins = await sock.plugins.get({
+            const plugins = await sock.plugins.query({
                 case: evento,
                 stubtype: true
             })
@@ -119,9 +138,16 @@ export default async (messages, sock) => {
         // index: 2
         try {
             let control = { end: false };
-            const plugins = await sock.plugins.get({
+            const plugins = await sock.plugins.query({
                 before: true, index: 2
             });
+
+            plugins.sort((a, b) => {
+                const priorityA = a.priority ?? Infinity;
+                const priorityB = b.priority ?? Infinity;
+                return priorityA - priorityB;
+            });
+
             for (let plugin of plugins) {
                 if (control.end) break;
                 await plugin.script(m, {
@@ -154,9 +180,16 @@ export default async (messages, sock) => {
         // index: 3
         try {
             let control = { end: false };
-            const plugins = await sock.plugins.get({
+            const plugins = await sock.plugins.query({
                 before: true, index: 3
             });
+
+            plugins.sort((a, b) => {
+                const priorityA = a.priority ?? Infinity;
+                const priorityB = b.priority ?? Infinity;
+                return priorityA - priorityB;
+            });
+
             for (let plugin of plugins) {
                 if (control.end) break;
                 await plugin.script(m, {

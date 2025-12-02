@@ -19,6 +19,7 @@ export default async ({ m, cached, message, contextInfo }) => {
     }
 
     m.sender.name = m.bot.fromMe ? m.bot.name : message.pushName || '';
+    m.sender.number = (m.sender.id)?.split('@')[0] || undefined;
     m.sender.user = '@' + m.sender.id?.split('@')[0] || undefined;
     m.sender.roles.bot = m.bot.id === m.sender.id;
 
@@ -26,7 +27,16 @@ export default async ({ m, cached, message, contextInfo }) => {
     m.sender.getPhoto = async () => await cached.sender.photo(m.sender.id, 'image')
     m.sender.role = async (...array) => array.some(role => m.sender.roles[role]);
     m.sender.mentioned = contextInfo.mentionedJid ?? [];
-
+    m.sender.db = async () => {
+        const data = await $base.open('@users')
+        return {
+            _data: data,
+            data: data.data[m.sender.id],
+            update: async () => {
+                await data.update()
+            }
+        }
+    }
 
     // store
     const db = await $base.open('@users')
