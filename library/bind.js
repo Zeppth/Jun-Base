@@ -4,6 +4,7 @@ import logger from './log.js';
 import { TmpStore } from './utils.js';
 
 import {
+    generateWAMessageContent,
     generateWAMessageFromContent,
     downloadMediaMessage,
 } from '@whiskeysockets/baileys';
@@ -26,9 +27,15 @@ export default async function (sock) {
             })
         }
 
+        sock.generateWMContent = (o) => {
+            return generateWAMessageContent(o, {
+                upload: sock.waUploadToServer
+            })
+        }
+
         sock.sendWAMContent = async (jid, message, options = {}) => {
-            const gmessage = generateWAMessageFromContent(jid, message, options)
-            return await sock.relayMessage(jid, gmessage.message, {})
+            const gmessage = await generateWAMessageFromContent(jid, message, options)
+            return sock.relayMessage(jid, gmessage.message, {})
         }
 
         sock.setReplyHandler = async (message, options = {}, expiresIn = 1000 * 60 * 15) => {

@@ -17,6 +17,18 @@ class handlerLoader {
             persistent: true
         });
 
+        this.watcher.on('add', (file) => {
+            file = path.basename(file);
+            setTimeout(() => this
+                .loadFile(file), 1000);
+        })
+
+        this.watcher.on('unlink', (file) => {
+            file = path.basename(file)
+            if (this.files.has(file))
+                this.files.delete(file)
+        })
+
         this.watcher.on('change', (file) => {
             file = path.basename(file);
             if (this.files.has(file))

@@ -1,5 +1,4 @@
 // ./library/db.js
-
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
@@ -29,20 +28,14 @@ const sfs = {
 };
 
 const folder = async (folder) => {
-    if (!folder) return $res
-        .error('Folder not set');
-    await fs.mkdir(folder,
-        { recursive: true });
+    if (!folder) return $res.error('Folder not set');
+    await fs.mkdir(folder, { recursive: true });
+
     return {
-        has: async (file) => sfs.has(path
-            .join(folder, file)),
-        get: async (file) => sfs.get(path
-            .join(folder, file)),
-        delete: async (file) => sfs.delete(path
-            .join(folder, file)),
-        set: async (file, data = {}) => sfs.set(path
-            .join(folder, file), JSON.stringify
-            (data, null, 2)),
+        has: async (file) => sfs.has(path.join(folder, file)),
+        get: async (file) => sfs.get(path.join(folder, file)),
+        delete: async (file) => sfs.delete(path.join(folder, file)),
+        set: async (file, data = {}) => sfs.set(path.join(folder, file), JSON.stringify(data, null, 2)),
     };
 };
 
@@ -50,19 +43,18 @@ const $data = {
     folder: false,
     bases: new Map(),
     timeouts: new Map(),
+    saveStates: new Map(),
+
     async index() {
-        if (!$data.folder) return $res
-            .error('Folder not set');
+        if (!$data.folder) return $res.error('Folder not set');
         if (!await this.folder.has('index.json'))
             await this.folder.set('index.json');
-        const file = await this.folder
-            .get('index.json');
+        const file = await this.folder.get('index.json');
         return {
-            data: file, update: async () => {
-                if (!this.folder) return $res
-                    .error('Folder not set');
-                return await this.folder
-                    .set('index.json', file);
+            data: file,
+            update: async () => {
+                if (!this.folder) return $res.error('Folder not set');
+                return await this.folder.set('index.json', file);
             }
         };
     }
@@ -70,29 +62,25 @@ const $data = {
 
 export default {
     async Start($folder) {
-        if (!$folder) return $res
-            .error('Folder path not set');
+        if (!$folder) return $res.error('Folder path not set');
         $data.folder = await folder($folder || './data');
         $data.index = await $data.index();
         return this;
     },
+
     async has(name) {
-        if (!$data.folder) return $res
-            .error('Folder not set');
-        if (typeof name !== 'string') return $res
-            .error('Name must be a string');
-        return $data.bases.has(name)
-            || !!$data.index.data[name];
+        if (!$data.folder) return $res.error('Folder not set');
+        if (typeof name !== 'string') return $res.error('Name must be a string');
+        return $data.bases.has(name) || !!$data.index.data[name];
     },
+
     async open(name) {
-        if (!$data.folder) return $res
-            .error('Folder not set');
-        if (typeof name !== 'string') return $res
-            .error('Name must be a string');
+        if (!$data.folder) return $res.error('Folder not set');
+        if (typeof name !== 'string') return $res.error('Name must be a string');
 
         if ($data.bases.has(name)) {
-            if ($data.timeouts.has(name)) $data
-                .timeouts.get(name).start();
+            if ($data.timeouts.has(name))
+                $data.timeouts.get(name).start();
             return $data.bases.get(name);
         }
 
@@ -110,43 +98,90 @@ export default {
             file = {};
         }
 
-        $data.bases.set(name, {
-            data: file,
-            async update() {
-                return await $data.folder
-                    .set($data.index.data[name]
-                        .id + '.json', this.data);
-            }
+        $data.saveStates.set(name, {
+            timer: null,
+            count: 0
         });
 
-        const timer = new SetTimeout(() => {
+        const baseObj = {
+            data: file,
+            async update() {
+                if ($data.timeouts.has(name))
+                    $data.timeouts.get(name).start();
+
+                const state = $data.saveStates.get(name);
+                const fileId = $data.index.data[name].id + '.json';
+
+                state.count++;
+
+                const doWrite = async () => {
+                    state.count = 0;
+                    state.timer = null;
+                    return await $data.folder
+                        .set(fileId, this.data);
+                };
+
+                if (state.timer) {
+                    clearTimeout(state.timer);
+                    state.timer = null;
+                }
+
+                if (state.count >= 5) {
+                    return await doWrite();
+                }
+
+                state.timer = setTimeout(() => {
+                    doWrite();
+                }, 5000);
+
+                return true;
+            }
+        };
+
+        $data.bases.set(name, baseObj);
+
+        const memoryTimer = new SetTimeout(async () => {
+            const state = $data.saveStates.get(name);
+            if (state && state.timer) {
+                clearTimeout(state.timer);
+                await $data.folder.set(
+                    $data.index.data[name].id
+                    + '.json', baseObj.data
+                );
+            }
+
             $data.bases.delete(name);
+            $data.saveStates.delete(name);
             $data.timeouts.delete(name);
         }, 60_000);
 
-        timer.start();
-        $data.timeouts
-            .set(name,
-                timer);
+        memoryTimer.start();
+        $data.timeouts.set(name, memoryTimer);
 
-        return $data.bases
-            .get(name);
+        return $data.bases.get(name);
     },
+
     async delete(name) {
-        if (!$data.folder) return $res
-            .error('Folder not set');
-        if (typeof name !== 'string') return $res
-            .error('Name must be a string');
-        if (!$data.index.data[name]) return $res
-            .error('Database not found');
+        if (!$data.folder) return $res.error('Folder not set');
+        if (typeof name !== 'string') return $res.error('Name must be a string');
+        if (!$data.index.data[name]) return $res.error('Database not found');
+
         const data = $data.index.data[name];
+
         if ($data.bases.has(name)) $data.bases.delete(name);
+        if ($data.saveStates.has(name)) {
+            const state = $data.saveStates.get(name);
+            if (state.timer) clearTimeout(state.timer);
+            $data.saveStates.delete(name);
+        }
         if ($data.timeouts.has(name)) {
             $data.timeouts.get(name).stop();
             $data.timeouts.delete(name);
         }
-        if (await $data.folder.has(data.id + '.json')) await $data
-            .folder.delete(data.id + '.json');
+
+        if (await $data.folder.has(data.id + '.json'))
+            await $data.folder.delete(data.id + '.json');
+
         delete $data.index.data[name];
         await $data.index.update();
         return true;
@@ -178,8 +213,6 @@ class SetTimeout {
     }
 
     status() {
-        return this.running
-            ? 'running'
-            : 'stopped';
+        return this.running ? 'running' : 'stopped';
     }
 }

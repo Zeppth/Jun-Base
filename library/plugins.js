@@ -4,108 +4,136 @@ import path from "path";
 import logger from "./log.js"
 import { pathToFileURL } from 'url';
 import { watch } from 'chokidar';
-import fs from 'fs/promises';
 import lodash from 'lodash'
+
+/**
+ * API Usage:
+ * plugins.import('@funcion')
+ * plugins.import({ file: 'utils/db.js' })
+ * plugins.query({ role: 'admin' })
+ * plugins.export('db', connection)
+ */
 
 export class Plugins {
     constructor(folderPath, defaultObjects = {}) {
-        this['@export'] = new Map();
-        this['@plugins'] = new Map();
-        this['@folderPath'] = path.resolve(folderPath);
-        this['@Objects'] = defaultObjects
-
-        watch(this['@folderPath'], {
-            persistent: true,
-            ignoreInitial: true,
-            depth: 99
-        }).on('add', (filePath) => {
-            const file_path = path.relative
-                (this['@folderPath'], filePath);
-
-            console.log(global.PLUGINS_MSG.newPlugin, file_path);
-            this.set(file_path);
-        }).on('change', (filePath) => {
-            const file_path = path.relative
-                (this['@folderPath'], filePath);
-
-            console.log(global.PLUGINS_MSG.updatedPlugin, file_path);
-            if (this['@plugins'].has(file_path))
-                this['@plugins'].delete(file_path)
-            setTimeout(() => this.set(file_path), 1000);
-        }).on('unlink', (filePath) => {
-            const file_path = path.relative
-                (this['@folderPath'], filePath);
-
-            console.log(global.PLUGINS_MSG.deletedPlugin, file_path);
-            if (this['@plugins'].has(file_path))
-                this['@plugins'].delete(file_path);
-        }).on('error', e => logger.error(e));
+        this.registry = new Map();
+        this.shared = new Map();
+        this.folder = path.resolve(folderPath);
+        this.context = defaultObjects;
+        this.watcher = null;
     }
 
-    has(any) { return this['@plugins'].has(any) }
-    delete(any) { return this['@plugins'].delete(any) }
-    import(any) { return this['@export'].get(any) }
+    remove(key) {
+        if (typeof key === 'string')
+            return this.registry.delete(key);
+        return null
+    }
 
-    export(any, object) {
-        if (!this['@export'].has(any)) {
-            this['@export'].set(any, object)
-        } else {
-            const existing = this['@export'].get(any);
-            Object.assign(existing, object)
+    import(query) {
+        if (typeof query === 'object' && query?.file)
+            return this.registry.get(query.file);
+        if (typeof query === 'string')
+            return this.shared.get(query) || null;
+        return null;
+    }
+
+    export(key, value) {
+        if (!this.shared.has(key))
+            this.shared.set(key, value);
+        else Object.assign(this
+            .shared.get(key), value);
+        return this.shared.get(key);
+    }
+
+    load() {
+        return new Promise((resolve, reject) => {
+            this.watcher = watch(this.folder, {
+                persistent: true,
+                ignoreInitial: false,
+                depth: 99
+            });
+
+            this.watcher.on('add', (filePath) => {
+                const relPath = path.relative(this.folder, filePath);
+                console.log(global.PLUGINS_MSG.newPlugin, relPath);
+                this.loadFile(relPath);
+            })
+
+            this.watcher.on('change', (filePath) => {
+                const relPath = path.relative(this.folder, filePath);
+                console.log(global.PLUGINS_MSG.updatedPlugin, relPath);
+                this.remove(relPath);
+                setTimeout(() => this.loadFile(relPath), 1000);
+            })
+
+            this.watcher.on('unlink', (filePath) => {
+                const relPath = path.relative(this.folder, filePath);
+                console.log(global.PLUGINS_MSG.deletedPlugin, relPath);
+                this.remove(relPath);
+            })
+
+            this.watcher.on('error', (e) => {
+                logger.error("Watcher Error:", e);
+                reject(e);
+            }).on('ready', () => { resolve() });
+        });
+    }
+
+    async loadFile(file) {
+        if (typeof file !== 'string') return;
+
+        const absPath = path.join(this.folder, file);
+        const fileURL = (pathToFileURL(absPath)).href
+        const versionedURL = `${fileURL}?update=${Date.now()}`;
+
+        const _import = async (fun) => {
+            try { return await fun(await import(versionedURL)) } catch (e) {
+                if (e.code === 'ERR_UNSUPPORTED_DIR_IMPORT') return;
+                logger.error(`Plugin Registration Error (${file}):`, e);
+            }
         }
-        return this['@export'].get(any);
-    }
 
-    async load() {
-        try {
-            const files = await fs.readdir
-                (this['@folderPath'], { recursive: true });
-            for (const file of files) { await this.set(file) }
-        } catch (e) {
-            logger.error("Error cargando plugins:", e);
-        }
-    }
-
-    async set(any) {
-        if (!any.endsWith('.plugin.js')) return;
-        const filePath = path.join(this['@folderPath'], any);
-        const fileURL = pathToFileURL(filePath);
-
-        try {
-            const mod = await import(`${fileURL.href}?update=${Date.now()}`);
+        if (file.endsWith('.plugin.js')) return _import(async (mod) => {
             const module = mod.default || mod;
             if (typeof module.export === 'object') {
-                Object.entries(module.export).forEach(([key, value]) => {
-                    this["@export"].set(key, value);
+                Object.entries(module.export).forEach(([k, v]) => {
+                    this.shared.set(k, v);
                 });
             }
 
-            this['@plugins'].set(any, {
-                ...this['@Objects'],
-                fileName: any,
+            this.registry.set(file, {
+                ...this.context,
+                fileName: file,
                 ...module
             });
 
-        } catch (e) {
-            if (e.code === 'ERR_UNSUPPORTED_DIR_IMPORT') return;
-            logger.error(`Error al cargar plugin ${any}:`, e);
-        }
+            return;
+        })
+
+        if (file.endsWith('.js')) return _import(async (mod) => {
+            this.registry.set(file, mod);
+        })
+
+        this.registry.set(file, absPath);
     }
 
-    async get(any) {
-        if (typeof any === 'string') return this['@plugins'].get(any);
-        if (typeof any !== 'object' || any === null) return [];
+    async query(object) {
+        if (typeof object === 'string') return this.registry.get(object);
+        if (typeof object !== 'object' || object === null) return [];
 
-        return Array.from(this['@plugins'].values()).filter(plugin =>
-            Object.entries(any).every(([key, value]) => {
-                if (typeof value === 'string' && Array.isArray(plugin[key]))
-                    return plugin[key].includes(value);
-                if (Array.isArray(value) && typeof plugin[key] === 'string')
-                    return value.includes(plugin[key]);
-                if (Array.isArray(value) && Array.isArray(plugin[key]))
-                    return value.some(v => plugin[key].includes(v));
-                return lodash.isEqual(value, plugin[key]);
-            })
-        );
+        return Array.from(this.registry.entries()).filter(([filename, plugin]) => {
+            if (!filename.endsWith('.plugin.js')) return false;
+            return Object.entries(object).every(([key, expected]) => {
+                if (!plugin || typeof plugin !== 'object') return false;
+                const actual = plugin[key];
+                if (typeof expected === 'string' && Array.isArray(actual))
+                    return actual.includes(expected);
+                if (Array.isArray(expected) && typeof actual === 'string')
+                    return expected.includes(actual);
+                if (Array.isArray(expected) && Array.isArray(actual))
+                    return expected.some(v => actual.includes(v));
+                return lodash.isEqual(expected, actual);
+            });
+        }).map(([_, plugin]) => plugin);
     }
 };
