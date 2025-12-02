@@ -511,7 +511,7 @@ Para plugins `stubtype`, el contexto incluye propiedades adicionales:
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                         EJECUCIÓN                               │   │
 │  │                                                                 │   │
-│  │  messages.upsert → core.handler → plugins.get(query) → script() │   │
+│  │  messages.upsert → core.handler → plugins.query(query) → script() │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -1342,7 +1342,7 @@ plugins.load() => Promise<void>
 plugins.set(fileName: String) => Promise<void>
 
 // Consultar plugins
-plugins.get(query: Object | String) => Promise<Array<Plugin>>
+plugins.query(query: Object | String) => Promise<Array<Plugin>>
 ```
 
 ## 7.3 Módulo db (Persistencia)
