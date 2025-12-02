@@ -519,7 +519,7 @@ Para plugins `stubtype`, el contexto incluye propiedades adicionales:
 
 ## 3.4 Sistema de Consulta de Plugins
 
-El método `plugins.get()` acepta un objeto de consulta que filtra plugins según sus propiedades:
+El método `plugins.query()` acepta un objeto de consulta que filtra plugins según sus propiedades:
 
 ```javascript
 // Obtener plugins de comando que coincidan con "help"
