@@ -12,7 +12,7 @@ import qrCode from 'qrcode';
 import logger from '../library/log.js';
 import $base from '../library/db.js';
 import { MakeBot } from '../library/client.js';
-import { Plugins } from '../library/plugins.js';
+import { Plugins } from '../library/plugins2.js';
 import $process from '../library/process.js';
 import $Sock from '../library/bind.js';
 
