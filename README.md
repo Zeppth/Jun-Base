@@ -1,375 +1,322 @@
 # Jun-Base
 
-SimpleBase de WhatsApp utilizando Baileys.
+## Sinopsis
 
-# Tabla de Contenidos
-
-1. [Introducción Arquitectónica](#1-introducción-arquitectónica)
-2. [Fundamentos del Objeto m](#2-fundamentos-del-objeto-m)
-3. [Arquitectura de Plugins](#3-arquitectura-de-plugins)
-4. [Sistema de Persistencia](#4-sistema-de-persistencia)
-5. [Gestión de Procesos](#5-gestión-de-procesos)
-6. [Ejemplos de Implementación](#6-ejemplos-de-implementación)
-7. [Referencia de API](#7-referencia-de-api)
+Framework modular para bots de WhatsApp construido sobre `@whiskeysockets/baileys`. Implementa una arquitectura **Event-Driven** con aislamiento de procesos mediante `child_process.fork()`. El sistema de plugins utiliza **hot-reload** vía `chokidar`, persistencia JSON con escritura diferida (debounced writes), y un pipeline de procesamiento de mensajes basado en **handlers encadenados**. Requiere Node.js ≥18.x con soporte ESM nativo.
 
 ---
 
-# 1. Introducción Arquitectónica
+## Tabla de Contenidos
 
-## 1.1 Visión General
+- [Visión General](#visión-general)
+- [Requisitos y Dependencias](#requisitos-y-dependencias)
+- [Instalación y Configuración](#instalación-y-configuración)
+- [Arquitectura y Lógica](#arquitectura-y-lógica)
+  - [Diagrama de Flujo](#diagrama-de-flujo)
+  - [Estructura de Directorios](#estructura-de-directorios)
+  - [Pipeline de Mensajes](#pipeline-de-mensajes)
+  - [Disponibilidad de Propiedades por Index](#disponibilidad-de-propiedades-por-index)
+- [Referencia de API](#referencia-de-api)
+  - [Core Modules](#core-modules)
+  - [Library Modules](#library-modules)
+  - [Objeto `m` (Message Context)](#objeto-m-message-context)
+- [Sistema de Plugins](#sistema-de-plugins)
+  - [Taxonomía de Plugins](#taxonomía-de-plugins)
+  - [Ciclo de Vida](#ciclo-de-vida)
+  - [Estructura de un Plugin](#estructura-de-un-plugin)
+  - [Sistema de Consulta](#sistema-de-consulta)
+  - [Exportación entre Plugins](#exportación-entre-plugins)
+  - [ReplyHandler](#replyhandler-flujos-conversacionales)
+- [Ejemplos de Uso](#ejemplos-de-uso)
+  - [Ejemplos Básicos](#ejemplo-1-comando-con-verificación-de-roles)
+  - [Sistema de Economía Completo](#ejemplo-5-sistema-de-economía-completo)
+- [Edge Cases y Consideraciones](#edge-cases-y-consideraciones)
+- [Apéndices](#apéndices)
+  - [Apéndice A: Eventos StubType](#apéndice-a-eventos-stubtype)
+  - [Apéndice B: Variables Globales](#apéndice-b-variables-globales)
 
-El Núcleo implementa una arquitectura de procesamiento de mensajes basada en pipeline, donde cada mensaje entrante atraviesa una cadena de handlers que construyen progresivamente un objeto de contexto unificado denominado `m`.
+---
 
-**Arquitectura del Sistema:**
+## Visión General
 
-```javascript
-// 1. Nivel de Infraestructura (Arranque y Conexión)
-index.js ➔ ForkManager ➔ core/main.js ➔ Baileys Socket
+### Características
 
-// 2. Nivel de Procesamiento (Pipeline de Handlers)
-Evento Entrante ➔ [m.cache ➔ m.bot ➔ m.chat ➔ m.sender ➔ ...] ➔ Contexto `m`
+- **Hot-reload**: Los plugins se recargan al guardar, sin reiniciar el bot
+- **Objeto `m` unificado**: Acceso normalizado a mensaje, remitente, chat y contenido
+- **Sistema de roles**: root, owner, mod, vip, admin (configurable)
+- **Persistencia JSON**: Base de datos con escritura diferida y auto-descarga de memoria
+- **Flujos conversacionales**: ReplyHandler para interacciones multi-paso
+- **Eventos de grupo**: Captura de joins, leaves, promociones, cambios de configuración
+- **Aislamiento de procesos**: El bot corre en proceso hijo con reconexión automática
 
-// 3. Nivel de Aplicación (Sistema de Plugins)
-Contexto `m` ➔ Plugins `before` (Middleware) ➔ Resolución de Comando / StubType
+### Casos de Uso
+
+| Tipo | Ejemplo |
+|------|---------|
+| Moderación | Anti-spam, anti-links, bienvenidas automáticas |
+| Utilidades | Stickers, descargas, conversiones |
+| Juegos/Economía | Sistemas de puntos, tiendas virtuales, rankings |
+| Integración | APIs externas, webhooks, notificaciones |
+
+---
+
+## Requisitos y Dependencias
+
+### Runtime
+
+| Requisito | Versión Mínima |
+|-----------|----------------|
+| Node.js   | 18.x LTS       |
+| npm       | 9.x            |
+
+### Dependencias Principales
+
+```json
+{
+  "@whiskeysockets/baileys": "^7.0.0-rc.8",
+  "chokidar": "^4.0.1",
+  "@hapi/boom": "^10.0.1",
+  "pino": "9.1.0",
+  "chalk": "^5.3.0",
+  "dotenv": "^17.0.0",
+  "lodash": "^4.17.21",
+  "moment-timezone": "^0.5.43"
+}
 ```
 
-## 1.2 Estructura de Directorios
+### Variables de Entorno
 
-```
-Jun-Base/
-├── index.js                 # Punto de entrada principal
-├── config.js                # Configuración global
-├── package.json
-│
-├── core/
-│   ├── index.js             # Inicialización del núcleo
-│   ├── main.js              # Gestión de conexión WebSocket
-│   ├── config.js            # Configuración interna del núcleo
-│   ├── format.js            # Esquema tipado del objeto m
-│   │
-│   └── handlers/            # Pipeline de construcción del objeto m
-│       ├── core.handler.js  # Orquestador principal
-│       ├── m.cache.js       # Sistema de caché temporal
-│       ├── m.bot.js         # Datos del bot
-│       ├── m.chat.js        # Datos del chat
-│       ├── m.chat.group.js  # Extensión para grupos
-│       ├── m.sender.js      # Datos del remitente
-│       ├── m.content.js     # Contenido del mensaje
-│       ├── m.quoted.sender.js # Mensaje citado
-│       ├── m.assign.js      # Métodos utilitarios
-│       ├── m.parser.js      # Parser de comandos
-│       ├── m.pre.parser.js  # Reply handlers
-│       └── [+] extrator.content.js # Extractores por tipo
-│
-├── library/
-│   ├── client.js            # cliente WhatsApp
-│   ├── plugins.js           # Gestor de plugins
-│   ├── db.js                # Sistema de persistencia JSON
-│   ├── fork.js              # Gestión de procesos hijo
-│   ├── bind.js              # Extensiones del socket
-│   ├── loader.js            # Cargador de handlers
-│   ├── process.js           # Abstracción de IPC
-│   ├── log.js               # Sistema de logging
-│   ├── purge.js             # Limpieza de temporales
-│   ├── setup.js             # Asistente de configuración inicial
-│   └── utils.js             # Utilidades (Timer, TmpStore, color)
-│
-├── plugins/                 # Directorio de plugins (usuario)
-│   └── *.plugin.js
-│
-└── storage/
-    ├── creds/               # Credenciales de sesión
-    ├── store/               # Base de datos JSON
-    └── temp/                # Archivos temporales
-```
+Crear archivo `.env` en la raíz:
 
-## 1.3 Flujo de Arranque
-
-```
-1. index.js
-   └── Ejecuta runQuestion() para determinar método de conexión
-   └── Instancia ForkManager con ./core/index.js
-   └── Registra listeners de eventos (message, exit, error)
-   └── Invoca mainBot.start()
-
-2. core/index.js (proceso hijo)
-   └── Carga config.js (global)
-   └── Carga core/config.js (proto, paths, db)
-   └── Inicializa handlerLoader
-   └── Instancia Plugins(./plugins)
-   └── Importa core/main.js
-
-3. core/main.js
-   └── Inicializa $base (sistema de persistencia)
-   └── Carga handlers con handlerLoader.loadFiles()
-   └── Carga plugins con plugins.load()
-   └── Ejecuta StartBot()
-       └── MakeBot() crea socket Baileys
-       └── Asigna plugins al socket
-       └── Registra eventos (connection.update, messages.upsert, call)
+```bash
+GOOGLE_API_KEY=tu_api_key_aqui  # Opcional: para integraciones con Google AI
 ```
 
 ---
 
-# 2. Fundamentos del Objeto m
+## Instalación y Configuración
 
-## 2.1 Naturaleza del Objeto m
+### 1. Clonar e instalar dependencias
 
-El objeto `m` constituye el contexto unificado de mensaje. No es un DTO estático, sino un objeto mutable que se enriquece progresivamente a través del pipeline de handlers. Cada handler añade propiedades y métodos específicos a su dominio.
-
-**Flujo de Construcción:**
-
-```javascript
-1. core.handler.js  -> m = { id }                        // Estado Inicial
-2. m.cache.js       -> m.cache = { group, sender }       // Capa de Caché
-3. m.bot.js         -> m.bot = { id, name, ... }         // Identidad del Bot
-4. m.chat.js        -> m.chat = { id, isGroup, db... }   // Contexto del Chat
-5. m.sender.js      -> m.sender = { id, roles... }       // Datos del Emisor
-6. m.content.js     -> m.content, m.quoted               // Proceso de Mensaje/Citas
-7. m.assign.js      -> m.reply(), m.react()              // Inyección de Métodos
-8. m.parser.js      -> m.command, m.args, m.isCmd        // Lógica de Comandos
+```bash
+git clone https://github.com/Zeppth/Jun-Base
+cd Jun-Base
+npm install
 ```
 
-## 2.2 Esquema Tipado Completo
+### 2. Configurar el bot
 
-El archivo `core/format.js` define el contrato estructural del objeto `m`. A continuación se presenta el esquema con anotaciones técnicas:
-
-### 2.2.1 Propiedades Raíz
-
-| Propiedad | Tipo | Descripción |
-|-----------|------|-------------|
-| `id` | `String` | Identificador único del mensaje (key.id de Baileys) |
-| `type` | `String` | Tipo de mensaje (`conversation`, `imageMessage`, `extendedTextMessage`, etc.) |
-| `message` | `Object` | Mensaje raw de Baileys sin procesar |
-| `body` | `String` | Texto normalizado del mensaje |
-| `command` | `String` | Comando extraído (sin prefijo) |
-| `args` | `Array<String>` | Argumentos separados por espacios |
-| `text` | `String` | Texto completo posterior al comando |
-| `tag` | `Array<String>` | Tags extraídos del formato `tag=valor` |
-| `isCmd` | `Boolean` | Indica si el mensaje coincide con un comando registrado |
-| `plugin` | `Object\|null` | Referencia al plugin que procesará el mensaje |
-
-### 2.2.2 Subobjeto m.bot
+Editar `config.js`:
 
 ```javascript
-m.bot = {
-    id: String,           // JID del bot (formato @lid)
-    name: String,         // Nombre del perfil
-    fromMe: Boolean,      // true si el mensaje proviene del bot
-    
-    roles: {
-        admin: Boolean    // true si es admin del grupo actual
-    },
-    
-    // Métodos asíncronos
-    getDesc: async () => String,
-    getPhoto: async () => String,  // URL de la foto
-    setPhoto: async (Buffer) => void,
-    setDesc: async (String) => void,
-    setName: async (String) => void,
-    join: async (inviteCode) => void,
-    mute: async (jid, Boolean, time?) => void,
-    block: async (jid, Boolean) => void,
-    role: async (...roles) => Boolean
-}
-```
+global.config = {
+    name: "MiBot",              // Nombre del bot
+    prefixes: ".¿?¡!#%&/,~@",   // Caracteres que activan comandos
+    saveHistory: true,          // Guardar historial de mensajes
+    autoRead: true              // Marcar mensajes como leídos
+};
 
-### 2.2.3 Subobjeto m.chat
-
-```javascript
-m.chat = {
-    id: String,           // JID del chat (remoteJid)
-    isGroup: Boolean,     // true si termina en @g.us
-    name: String,         // Nombre del grupo (si aplica)
-    desc: String,         // Descripción del grupo
-    size: Number,         // Cantidad de participantes
-    created: Number,      // Timestamp de creación
-    owner: String,        // JID del propietario
-    participants: Array,  // Lista de participantes
-    admins: Array<String>,// JIDs de administradores
-    
-    // Métodos para grupos
-    add: async (jid) => void,
-    remove: async (jid) => void,
-    promote: async (jid) => void,
-    demote: async (jid) => void,
-    getPhoto: async (type?, id?) => String,
-    setPhoto: async (Buffer) => void,
-    setDesc: async (String) => void,
-    setName: async (String) => void,
-    getCodeInvite: async () => String,
-    getLinkInvite: async () => String,
-    revoke: async () => void,
-    
-    settings: {
-        lock: async (Boolean) => void,
-        announce: async (Boolean) => void,
-        memberAdd: async (Boolean) => void,
-        joinApproval: async (Boolean) => void
-    },
-    
-    // Acceso a base de datos del chat
-    db: async () => { data: Object, update: async () => void }
-}
-```
-
-### 2.2.4 Subobjeto m.sender
-
-```javascript
-m.sender = {
-    id: String,           // JID del remitente
-    name: String,         // pushName o nombre almacenado
-    user: String,         // Formato @número
-    mentioned: Array<String>, // JIDs mencionados
-    
-    roles: {
-        root: Boolean,    // Rol máximo (definido en config)
-        owner: Boolean,   // Propietario del bot
-        mod: Boolean,     // Moderador
-        vip: Boolean,     // Usuario premium
-        admin: Boolean,   // Admin del grupo actual
-        bot: Boolean      // true si sender === bot
-    },
-    
-    getDesc: async () => String,
-    getPhoto: async () => String,
-    role: async (...roles) => Boolean  // Verifica si tiene algún rol
-}
-```
-
-### 2.2.5 Subobjeto m.content
-
-```javascript
-m.content = {
-    text: String,         // Texto extraído según tipo de mensaje
-    args: Array<String>,  // text.split(/ +/)
-    
-    media: {              // Solo si type es imageMessage o videoMessage
-        mimeType: String,
-        fileName: String,
-        download: async () => Buffer
-    } | false
-}
-```
-
-### 2.2.6 Subobjeto m.quoted
-
-Presente únicamente cuando el mensaje es una respuesta a otro mensaje:
-
-```javascript
-m.quoted = {
-    id: String,
-    type: String,
-    
-    sender: {
-        id: String,
-        name: String,
-        roles: { ... },   // Misma estructura que m.sender.roles
-        getDesc: async () => String,
-        getPhoto: async () => String,
-        role: async (...roles) => Boolean
-    },
-    
-    content: {
-        text: String,
-        args: Array<String>,
-        media: { ... } | false
+// Roles de usuario (usar número sin símbolos)
+global.config.userRoles = {
+    "521234567890": {
+        root: true,   // Acceso total
+        owner: true,  // Propietario
+        mod: true,    // Moderador
+        vip: true     // Usuario premium
     }
 }
 ```
 
-### 2.2.7 Métodos Utilitarios
+### 3. Iniciar el bot
 
-```javascript
-// Responder al mensaje
-m.reply = async (text: String | Object) => Message
-
-// Reaccionar al mensaje
-m.react = async (emoji: String) => void
-// Soporta alias: 'wait', 'done', 'error' → ⌛, ✔️, ✖️
-
-// Enviar mensaje predefinido
-m.sms = (type: String) => Message | undefined
-// Tipos: 'root', 'owner', 'mod', 'vip', 'group', 'private', 
-//        'admin', 'botAdmin', 'unreg', 'restrict'
+```bash
+npm start
 ```
 
-## 2.3 Manipulación Correcta del Objeto m
+El sistema presentará un menú interactivo:
 
-### 2.3.1 Acceso Seguro a Propiedades
+```
+~> ¿Cómo desea conectarse?
+1. Código QR.
+2. Código de 8 dígitos.
+```
 
-El objeto `m` se construye progresivamente. Acceder a propiedades antes de su inicialización producirá `undefined`.
+### 4. Estructura de almacenamiento generada
+
+```
+storage/
+├── creds/          # Credenciales de sesión (creds.json)
+├── store/          # Base de datos JSON
+│   ├── index.json  # Índice de bases de datos
+│   └── *.json      # Datos persistidos
+└── temp/           # Archivos temporales (purgados cada 60s)
+```
+
+---
+
+## Arquitectura y Lógica
+
+### Diagrama de Flujo
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              PROCESO PRINCIPAL                          │
+│  index.js                                                               │
+│  └─> ForkManager ──fork()──> core/index.js (PROCESO HIJO)              │
+│          │                        │                                     │
+│          │ IPC                    ├─> Baileys WebSocket                 │
+│          │ (process.send)         ├─> Plugin Watcher                    │
+│          ▼                        └─> Handler Pipeline                  │
+│  ┌───────────────┐                         │                            │
+│  │ Event Handler │◄────────────────────────┘                            │
+│  │ - qr-code     │                                                      │
+│  │ - pin-code    │         ┌──────────────────────────────────┐         │
+│  │ - connection  │         │     HANDLER PIPELINE             │         │
+│  │ - console:log │         │                                  │         │
+│  └───────────────┘         │  message ──► m.content.js        │         │
+│                            │          ──► m.bot.js            │         │
+│                            │          ──► m.chat.js           │         │
+│                            │          ──► m.sender.js         │         │
+│                            │          ──► m.parser.js         │         │
+│                            │          ──► plugin.script()     │         │
+│                            └──────────────────────────────────┘         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Estructura de Directorios
+
+```
+SimpleBase-1.2.5/
+├── index.js              # Entry point: inicia ForkManager
+├── config.js             # Configuración global del bot
+├── package.json
+│
+├── core/
+│   ├── index.js          # Bootstrap del proceso hijo
+│   ├── main.js           # Conexión Baileys + event listeners
+│   ├── config.js         # Carga package.json, define rutas globales
+│   ├── format.js         # Schema TypeScript-like del objeto `m`
+│   │
+│   └── handlers/         # Pipeline de procesamiento
+│       ├── core.handler.js        # Orquestador principal
+│       ├── m.content.js           # Extrae texto/media del mensaje
+│       ├── m.bot.js               # Info del bot (id, nombre, métodos)
+│       ├── m.chat.js              # Info del chat (grupo/privado)
+│       ├── m.chat.group.js        # Metadata de grupos
+│       ├── m.sender.js            # Info del remitente + roles
+│       ├── m.quoted.sender.js     # Info del mensaje citado
+│       ├── m.assign.js            # Métodos utilitarios (reply, react)
+│       ├── m.parser.js            # Parsea comandos
+│       ├── m.pre.parser.js        # ReplyHandler (flujos conversacionales)
+│       ├── m.cache.js             # Cache memoizado (fotos, metadata)
+│       └── [+] extrator.content.js # Extractores por tipo de mensaje
+│
+├── library/
+│   ├── client.js         # Factory: MakeBot() crea conexión Baileys
+│   ├── plugins.js        # Sistema de plugins con hot-reload
+│   ├── db.js             # Base de datos JSON con escritura diferida
+│   ├── fork.js           # ForkManager: gestión de subprocesos
+│   ├── loader.js         # Carga dinámica de handlers
+│   ├── bind.js           # Extiende sock con métodos adicionales
+│   ├── process.js        # Wrapper de process para IPC
+│   ├── utils.js          # SimpleTimer, TmpStore, color
+│   ├── log.js            # Logger centralizado
+│   ├── setup.js          # Wizard de configuración inicial
+│   └── purge.js          # Limpia /temp cada 60 segundos
+│
+├── plugins/              # Directorio de plugins (hot-reload)
+│   └── *.plugin.js
+│
+└── storage/              # Generado en runtime
+    ├── creds/
+    ├── store/
+    └── temp/
+```
+
+### Pipeline de Mensajes
+
+El archivo `core.handler.js` orquesta el flujo de procesamiento:
+
+```
+1. MENSAJE ENTRANTE (messages.upsert)
+        │
+        ▼
+2. EXTRACCIÓN DE CONTENIDO (m.content.js)
+   └─> Determina tipo: conversation, imageMessage, videoMessage, etc.
+   └─> Extrae texto, media, contextInfo
+        │
+        ▼
+3. CONSTRUCCIÓN DEL CONTEXTO
+   ├─> m.bot.js      → Información del bot
+   ├─> m.chat.js     → Información del chat
+   ├─> m.sender.js   → Información del remitente + roles
+   └─> m.assign.js   → Métodos: reply(), react(), sms()
+        │
+        ▼
+4. PLUGINS BEFORE (index: 1)
+   └─> Plugins con `before: true, index: 1` se ejecutan primero
+   └─> Pueden detener el flujo con `control.end = true`
+        │
+        ▼
+5. VERIFICACIÓN DE BANS
+   └─> Usuarios/chats baneados son ignorados
+        │
+        ▼
+6. METADATA DE GRUPO (si aplica)
+   └─> m.chat.group.js → participantes, admins, nombre, descripción
+        │
+        ▼
+7. STUBTYPE EVENTS (si message.messageStubType)
+   └─> Eventos de grupo: añadir/remover participantes, cambiar nombre, etc.
+        │
+        ▼
+8. PLUGINS BEFORE (index: 2)
+        │
+        ▼
+9. PARSING DEL COMANDO (m.parser.js)
+   └─> Detecta prefijo, extrae comando, busca plugin correspondiente
+        │
+        ▼
+10. REPLY HANDLER (m.pre.parser.js)
+    └─> Si es respuesta a un mensaje con handler registrado
+        │
+        ▼
+11. PLUGINS BEFORE (index: 3)
+        │
+        ▼
+12. EJECUCIÓN DEL PLUGIN
+    └─> plugin.script(m, { sock, plugin, store })
+```
+
+### Disponibilidad de Propiedades por Index
+
+El objeto `m` se construye progresivamente. Acceder a propiedades antes de su inicialización produce `undefined`. La siguiente tabla muestra qué propiedades están disponibles en cada punto del pipeline:
+
+| Index | Propiedades Disponibles |
+|-------|-------------------------|
+| **1** | `m.id`, `m.message`, `m.cache`, `m.bot.id`, `m.bot.name`, `m.bot.fromMe`, `m.chat.id`, `m.chat.isGroup`, `m.sender.id`, `m.sender.name`, `m.sender.number`, `m.content.text`, `m.content.args`, `m.content.media`, `m.quoted` (si existe) |
+| **2** | Todo lo anterior + `m.chat.admins`, `m.chat.participants`, `m.chat.name`, `m.chat.desc`, `m.chat.size`, `m.chat.owner`, `m.bot.roles.admin`, `m.sender.roles.admin` |
+| **3** | Todo lo anterior + `m.command`, `m.args`, `m.text`, `m.body`, `m.tag`, `m.isCmd`, `m.plugin` |
+
+**Ejemplo de acceso seguro en plugin before:**
 
 ```javascript
-// INCORRECTO: Acceso prematuro en plugin before:index=1
+// INCORRECTO: m.chat.admins no existe en index=1
 export default {
     before: true,
     index: 1,
     script: async (m) => {
-        // m.chat.admins aún no existe en index=1
         console.log(m.chat.admins); // undefined
     }
 }
 
-// CORRECTO: Verificar existencia
+// CORRECTO: Verificar existencia o usar index apropiado
 export default {
     before: true,
-    index: 1,
+    index: 2,  // Aquí ya existe m.chat.admins
     script: async (m) => {
-        if (m.chat?.admins) {
-            console.log(m.chat.admins);
-        }
-    }
-}
-```
-
-### 2.3.2 Orden de Disponibilidad por Handler Index
-
-| Index | Propiedades Disponibles |
-|-------|-------------------------|
-| 1 | `m.id`, `m.message`, `m.cache`, `m.bot`, `m.chat.id`, `m.chat.isGroup`, `m.sender.id`, `m.sender.name`, `m.content` |
-| 2 | Todo lo anterior + `m.chat.admins`, `m.chat.participants`, `m.bot.roles.admin`, `m.sender.roles.admin` (si es grupo) |
-| 3 | Todo lo anterior + `m.command`, `m.args`, `m.text`, `m.isCmd`, `m.plugin`, `m.body`, `m.tag` |
-
-### 2.3.3 Mutabilidad y Efectos Secundarios
-
-El objeto `m` es mutable. Las modificaciones persisten a lo largo del pipeline:
-
-```javascript
-// Plugin before:index=2
-export default {
-    before: true,
-    index: 2,
-    script: async (m, { control }) => {
-        // Modificar m afecta plugins posteriores
-        m.customFlag = true;
-        m.sender.roles.custom = true;
-    }
-}
-
-// Plugin de comando posterior
-export default {
-    case: 'test',
-    command: true,
-    script: async (m) => {
-        console.log(m.customFlag);        // true
-        console.log(m.sender.roles.custom); // true
-    }
-}
-```
-
-### 2.3.4 Control de Flujo
-
-Los plugins `before` pueden interrumpir el pipeline:
-
-```javascript
-export default {
-    before: true,
-    index: 1,
-    script: async (m, { control }) => {
-        if (m.sender.roles.banned) {
-            control.end = true;  // Detiene todo procesamiento posterior
-            return;
+        if (m.chat.isGroup) {
+            console.log(m.chat.admins); // Array<String>
         }
     }
 }
@@ -377,11 +324,308 @@ export default {
 
 ---
 
-# 3. Arquitectura de Plugins
+## Referencia de API
 
-## 3.1 Taxonomía de Plugins
+### Core Modules
 
-El Núcleo reconoce tres categorías de plugins según sus propiedades declarativas:
+#### `MakeBot(options, store)` — `library/client.js`
+
+Crea una conexión autenticada con WhatsApp.
+
+```javascript
+/**
+ * @param {Object} options
+ * @param {string} options.connectType - 'qr-code' | 'pin-code'
+ * @param {string} options.phoneNumber - Número para pin-code (sin símbolos)
+ * @param {Object} store - Instancia de store (opcional)
+ * 
+ * @returns {Promise<Object>} sock - Instancia de Baileys extendida
+ */
+```
+
+**Comportamiento:**
+- `qr-code`: Muestra QR en terminal, browser se establece como `macOS('Desktop')`
+- `pin-code`: Solicita código de 8 dígitos, browser se establece como `ubuntu('Chrome')`
+
+---
+
+#### `class Plugins` — `library/plugins.js`
+
+Sistema de plugins con hot-reload.
+
+```javascript
+const plugins = new Plugins(folderPath, defaultContext)
+```
+
+**Métodos:**
+
+| Método | Firma | Retorno | Descripción |
+|--------|-------|---------|-------------|
+| `load()` | `() -> Promise<void>` | — | Inicia watcher y carga plugins existentes |
+| `query(filter)` | `(Object) -> Array<Plugin>` | Plugins que coinciden | Busca plugins por propiedades |
+| `import(key)` | `(string \| {file}) -> any` | Valor exportado | Obtiene exports compartidos |
+| `export(key, value)` | `(string, any) -> any` | Valor almacenado | Registra valor compartido entre plugins |
+| `remove(key)` | `(string) -> boolean` | Éxito | Elimina plugin del registro |
+
+**Lógica de coincidencia en `query()`:**
+
+| Query | Plugin | ¿Coincide? |
+|-------|--------|------------|
+| `case: 'help'` | `case: ['help', 'ayuda']` | ✓ Sí |
+| `case: ['help', 'ayuda']` | `case: 'help'` | ✓ Sí |
+| `case: ['a', 'b']` | `case: ['b', 'c']` | ✓ Sí (intersección) |
+| `case: 'test'` | `case: 'otro'` | ✗ No |
+
+---
+
+#### `db` — `library/db.js`
+
+Base de datos JSON con persistencia diferida.
+
+```javascript
+import db from './library/db.js'
+
+await db.start('./storage/store')  // Inicializar
+```
+
+**Métodos:**
+
+| Método | Firma | Retorno | Descripción |
+|--------|-------|---------|-------------|
+| `start(path)` | `(string) -> Promise<db>` | Instancia | Inicializa la base de datos |
+| `open(name)` | `(string) -> Promise<{data, update}>` | Objeto DB | Abre/crea una base de datos |
+| `has(name)` | `(string) -> Promise<boolean>` | Existe | Verifica existencia |
+| `delete(name)` | `(string) -> Promise<boolean>` | Éxito | Elimina base de datos |
+
+**Comportamiento de `update()`:**
+- Las escrituras se agrupan (debounce de 5 segundos)
+- Después de 5 llamadas consecutivas, fuerza escritura inmediata
+- Bases inactivas por 60 segundos se descargan de memoria
+
+**Bases de datos predefinidas:**
+
+| Nombre | Propósito |
+|--------|-----------|
+| `@users` | Datos globales de usuarios |
+| `@chat:{jid}` | Datos específicos de un grupo |
+| `@reply:Handler` | Reply handlers activos |
+| `@history/{jid}` | Historial de mensajes por chat |
+| `@history/{jid}/{sender}` | Historial por usuario en chat |
+
+---
+
+#### `class ForkManager` — `library/fork.js`
+
+Gestiona procesos hijo con comunicación IPC.
+
+```javascript
+const bot = new ForkManager(modulePath, {
+    execArgv: ['--max-old-space-size=512'],
+    env: { dataConfig: {}, connOptions: {} }
+})
+```
+
+**Métodos:**
+
+| Método | Firma | Retorno | Descripción |
+|--------|-------|---------|-------------|
+| `start(callback?)` | `(Function?) -> Promise<void>` | — | Inicia el proceso hijo |
+| `stop(callback?)` | `(Function?) -> Promise<void>` | — | Detiene el proceso (SIGTERM) |
+| `send(content, type?)` | `(Object, 'send'\|'request') -> Promise` | — | Envía mensaje IPC |
+| `event.set(name, fn)` | `(string, Function) -> boolean` | — | Registra handler de evento |
+
+**Eventos disponibles:** `message`, `error`, `exit`
+
+---
+
+### Library Modules
+
+#### `TmpStore` — `library/utils.js`
+
+Cache en memoria con TTL automático.
+
+```javascript
+const cache = new TmpStore(60000)  // 60 segundos TTL
+
+cache.set('key', value)   // Almacena con TTL
+cache.get('key')          // Obtiene valor
+cache.has('key')          // Verifica existencia
+cache.delete('key')       // Elimina manualmente
+cache.clear()             // Limpia todo
+cache.keys()              // Array de claves
+cache.values()            // Array de valores
+```
+
+---
+
+#### `SimpleTimer` — `library/utils.js`
+
+Wrapper para setTimeout/setInterval con control de estado.
+
+```javascript
+const timer = new SimpleTimer(
+    () => console.log('tick'), 
+    5000, 
+    'interval'  // 'timeout' | 'interval'
+)
+
+timer.start()   // Inicia
+timer.stop()    // Detiene
+timer.status    // true si está corriendo
+```
+
+---
+
+#### `color` — `library/utils.js`
+
+Colores ANSI para terminal.
+
+```javascript
+import { color } from './library/utils.js';
+
+console.log(color.rgb(255, 100, 0) + 'Texto naranja' + color.reset)
+console.log(color.bg.rgb(0, 0, 255) + 'Fondo azul' + color.reset)
+```
+
+---
+
+### Objeto `m` (Message Context)
+
+El objeto `m` se construye en cada mensaje y contiene toda la información normalizada.
+
+```typescript
+interface MessageContext {
+    id: string                    // ID único del mensaje
+    type: string                  // Tipo: 'conversation', 'imageMessage', etc.
+    message: Object               // Mensaje raw de Baileys
+    body: string                  // Texto del mensaje
+    command: string               // Comando extraído (sin prefijo)
+    args: string[]                // Argumentos del comando
+    text: string                  // Texto completo después del comando
+    tag: string[]                 // Tags extraídos (tag=value)
+    isCmd: boolean                // ¿Es un comando válido?
+    plugin: Object | null         // Plugin que maneja el comando
+
+    bot: {
+        id: string                // JID del bot
+        name: string              // Nombre del bot
+        number: string            // Número sin @lid
+        fromMe: boolean           // ¿Mensaje enviado por el bot?
+        roles: { admin: boolean } // Roles del bot en el chat
+        
+        // Métodos
+        getDesc(): Promise<string>
+        getPhoto(): Promise<string>
+        setPhoto(image: Buffer): Promise<void>
+        setDesc(desc: string): Promise<void>
+        setName(name: string): Promise<void>
+        join(inviteCode: string): Promise<void>
+        mute(id: string, state: boolean, time?: number): Promise<void>
+        block(id: string, state: boolean): Promise<void>
+        role(...roles: string[]): boolean
+    }
+
+    chat: {
+        id: string                // JID del chat
+        isGroup: boolean          // ¿Es un grupo?
+        name: string              // Nombre del grupo/contacto
+        desc: string              // Descripción
+        size: number              // Número de participantes
+        created: number           // Timestamp de creación
+        owner: string             // JID del creador
+        participants: Object[]    // Lista de participantes
+        admins: string[]          // JIDs de administradores
+        
+        // Métodos (solo grupos)
+        db(): Promise<{data, update}>
+        add(user: string): Promise<void>
+        remove(user: string): Promise<void>
+        promote(user: string): Promise<void>
+        demote(user: string): Promise<void>
+        getPhoto(type?: string): Promise<string>
+        setPhoto(image: Buffer): Promise<void>
+        setDesc(desc: string): Promise<void>
+        setName(name: string): Promise<void>
+        getCodeInvite(): Promise<string>
+        getLinkInvite(): Promise<string>
+        revoke(): Promise<void>
+        settings: {
+            lock(bool: boolean): Promise<void>
+            announce(bool: boolean): Promise<void>
+            memberAdd(bool: boolean): Promise<void>
+            joinApproval(bool: boolean): Promise<void>
+        }
+    }
+
+    sender: {
+        id: string                // JID del remitente
+        name: string              // pushName
+        number: string            // Número sin @lid
+        user: string              // Formato @número
+        mentioned: string[]       // JIDs mencionados
+        roles: {
+            root: boolean         // Dueño absoluto
+            owner: boolean        // Propietario
+            mod: boolean          // Moderador
+            vip: boolean          // Usuario premium
+            admin: boolean        // Admin del grupo
+            bot: boolean          // Es el bot
+        }
+        
+        // Métodos
+        db(): Promise<{data, _data, update}>
+        getDesc(): Promise<string>
+        getPhoto(): Promise<string>
+        role(...roles: string[]): boolean
+    }
+
+    content: {
+        text: string              // Texto del mensaje
+        args: string[]            // Texto dividido por espacios
+        media: false | {
+            mimeType: string
+            fileName: string
+            download(): Promise<Buffer>
+        }
+    }
+
+    quoted?: {                    // Presente si cita un mensaje
+        id: string
+        type: string
+        sender: { /* igual que sender */ }
+        content: { /* igual que content */ }
+    }
+
+    // Métodos utilitarios
+    reply(text: string | Object): Promise<Message>
+    react(emoji: string): Promise<void>    // 'wait' | 'done' | 'error' | emoji
+    sms(type: string): Promise<void>       // Envía mensaje predefinido
+    db(id: string): Promise<{data, update}>
+    setBan(id: string, state: boolean): Promise<void>
+    setRole(id: string, state: boolean, ...roles: string[]): Promise<boolean>
+}
+```
+
+**Tipos de `sms()` disponibles:**
+
+| Tipo | Mensaje |
+|------|---------|
+| `root` | "Este comando solo puede ser utilizado por el *dueño*" |
+| `owner` | "Este comando solo puede ser utilizado por un *propietario*" |
+| `mod` | "Este comando solo puede ser utilizado por un *moderador*" |
+| `vip` | "Esta solicitud es solo para usuarios *premium*" |
+| `group` | "Este comando solo se puede usar en *grupos*" |
+| `private` | "Este comando solo se puede usar por *chat privado*" |
+| `admin` | "Este comando solo puede ser usado por los *administradores del grupo*" |
+| `botAdmin` | "El bot necesita *ser administrador* para usar este comando" |
+| `unreg` | "Regístrese para usar esta función..." |
+| `restrict` | "Esta función está desactivada" |
+
+---
+
+## Sistema de Plugins
+
+### Taxonomía de Plugins
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -401,6 +645,7 @@ El Núcleo reconoce tres categorías de plugins según sus propiedades declarati
 │  │ 2. PLUGINS DE INTERCEPTACIÓN (BEFORE)                          │  │
 │  │    before: true                                                │  │
 │  │    index: 1 | 2 | 3                                            │  │
+│  │    priority: Number (menor = mayor prioridad)                  │  │
 │  │                                                                │  │
 │  │    Se ejecutan en puntos específicos del pipeline              │  │
 │  │    Pueden interrumpir el flujo con control.end = true          │  │
@@ -418,62 +663,7 @@ El Núcleo reconoce tres categorías de plugins según sus propiedades declarati
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-## 3.2 Anatomía de un Plugin
-
-### 3.2.1 Estructura Base
-
-Todo plugin debe exportar un objeto con la siguiente estructura mínima:
-
-```javascript
-// plugins/ejemplo.plugin.js
-export default {
-    // === IDENTIFICACIÓN ===
-    case: 'comando',          // String o Array<String>
-    
-    // === CLASIFICACIÓN ===
-    command: true,            // Plugin de comando
-    // O bien:
-    // before: true,          // Plugin de interceptación
-    // index: 1,              // Punto de ejecución (1, 2 o 3)
-    // O bien:
-    // stubtype: true,        // Plugin de evento
-    
-    // === OPCIONES ===
-    usePrefix: true,          // Requiere prefijo (default: true)
-    
-    // === LÓGICA ===
-    script: async (m, context) => {
-        // Implementación
-    }
-}
-```
-
-### 3.2.2 Objeto Context
-
-El segundo parámetro de `script` contiene:
-
-```javascript
-{
-    sock: Object,      // Socket de Baileys con extensiones
-    plugin: Plugins,   // Instancia del gestor de plugins
-    store: Object,     // Store de Baileys (si está habilitado)
-    control: Object    // Solo en plugins before: { end: Boolean }
-}
-```
-
-Para plugins `stubtype`, el contexto incluye propiedades adicionales:
-
-```javascript
-{
-    sock: Object,
-    plugin: Plugins,
-    store: Object,
-    even: String,           // Nombre del evento
-    parameters: Array       // Parámetros del stub
-}
-```
-
-## 3.3 Ciclo de Vida de Plugins
+### Ciclo de Vida
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -506,93 +696,277 @@ Para plugins `stubtype`, el contexto incluye propiedades adicionales:
 │  │             │        │             │                                │
 │  │ delete(key) │        │ delete(key) │                                │
 │  │ reimport()  │        │             │                                │
+│  │ (delay 1s)  │        │             │                                │
 │  └─────────────┘        └─────────────┘                                │
 │                                                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                         EJECUCIÓN                               │   │
 │  │                                                                 │   │
-│  │  messages.upsert → core.handler → plugins.query(query) → script() │   │
+│  │  messages.upsert → core.handler → plugins.query() → script()   │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 3.4 Sistema de Consulta de Plugins
+### Estructura de un Plugin
 
-El método `plugins.query()` acepta un objeto de consulta que filtra plugins según sus propiedades:
-
-```javascript
-// Obtener plugins de comando que coincidan con "help"
-const plugins = await sock.plugins.query({
-    case: 'help',
-    command: true,
-    usePrefix: true
-});
-
-// Obtener plugins before con index 2
-const beforePlugins = await sock.plugins.query({
-    before: true,
-    index: 2
-});
-
-// Obtener plugin de evento específico
-const eventPlugin = await sock.plugins.query({
-    case: 'GROUP_PARTICIPANT_ADD',
-    stubtype: true
-});
-```
-
-La lógica de coincidencia maneja múltiples escenarios:
-
-| Query | Plugin | Coincide |
-|-------|--------|----------|
-| `case: 'help'` | `case: ['help', 'ayuda']` | Sí |
-| `case: ['help', 'ayuda']` | `case: 'help'` | Sí |
-| `case: ['a', 'b']` | `case: ['b', 'c']` | Sí (intersección) |
-
-## 3.5 Creación de Plugins
-
-### 3.5.1 Plugin de Comando Básico
+Los archivos deben terminar en `.plugin.js` y ubicarse en `/plugins/`.
 
 ```javascript
-// plugins/saludar.plugin.js
+// plugins/ejemplo.plugin.js
+
 export default {
-    case: ['saludar', 'hola', 'hi'],
-    command: true,
-    usePrefix: true,
+    // === IDENTIFICACIÓN ===
+    case: ['ping', 'p'],      // String o Array<String>
     
-    script: async (m, { sock }) => {
-        const hora = new Date().getHours();
-        let saludo;
+    // === CLASIFICACIÓN ===
+    usePrefix: true,          // Requiere prefijo (default: true)
+    command: true,            // Plugin de comando
+    
+    // === PARA PLUGINS BEFORE ===
+    // before: true,
+    // index: 1,              // Punto de ejecución (1, 2 o 3)
+    // priority: 10,          // Menor = mayor prioridad
+    
+    // === PARA PLUGINS STUBTYPE ===
+    // stubtype: true,
+    // case: 'GROUP_PARTICIPANT_ADD',
+    
+    // === FUNCIÓN PRINCIPAL ===
+    async script(m, context) {
+        const { sock, plugin, store } = context
+        // Para plugins before: context.control
+        // Para plugins stubtype: context.parameters, context.even
         
-        if (hora < 12) saludo = 'Buenos días';
-        else if (hora < 19) saludo = 'Buenas tardes';
-        else saludo = 'Buenas noches';
-        
-        await m.reply(`${saludo}, ${m.sender.name}`);
+        await m.reply('Pong!')
     }
 }
 ```
 
-### 3.5.2 Plugin de Interceptación (Filtro de Spam)
+**Objeto `context` según tipo de plugin:**
+
+| Tipo | Propiedades de `context` |
+|------|--------------------------|
+| Comando | `sock`, `plugin`, `store` |
+| Before | `sock`, `plugin`, `store`, `control` |
+| StubType | `sock`, `plugin`, `store`, `parameters`, `even` |
+
+### Sistema de Consulta
 
 ```javascript
-// plugins/antispam.plugin.js
+// Buscar comandos con prefijo
+const cmds = await plugins.query({ 
+    case: 'ping', 
+    usePrefix: true, 
+    command: true 
+});
+
+// Buscar plugins before con index 2
+const beforePlugins = await plugins.query({
+    before: true,
+    index: 2
+});
+
+// Buscar eventos stubtype
+const events = await plugins.query({ 
+    case: 'GROUP_PARTICIPANT_ADD', 
+    stubtype: true 
+});
+```
+
+### Exportación entre Plugins
+
+Los plugins pueden exportar funciones y valores para ser consumidos por otros:
+
+**Plugin que exporta:**
+
+```javascript
+// plugins/utils/helpers.plugin.js
+
+const formatNumber = (n) => n.toLocaleString('es-ES');
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+export default {
+    before: true,
+    index: 1,
+    
+    export: {
+        '@helpers': {
+            formatNumber,
+            randomInt
+        }
+    },
+    
+    async script() {
+        // Plugin mínimo, solo exporta
+    }
+}
+```
+
+**Plugin que consume:**
+
+```javascript
+// plugins/comandos/dado.plugin.js
+
+export default {
+    case: 'dado',
+    command: true,
+    
+    async script(m, { plugin }) {
+        const helpers = plugin.import('@helpers');
+        const resultado = helpers.randomInt(1, 6);
+        
+        await m.reply(`🎲 Obtuviste: ${resultado}`);
+    }
+}
+```
+
+### ReplyHandler (Flujos Conversacionales)
+
+Permite crear interacciones multi-paso donde el bot espera respuestas específicas:
+
+```javascript
+async script(m, { sock }) {
+    const msg = await m.reply('¿Cuál es tu nombre?')
+    
+    await sock.setReplyHandler(msg, {
+        security: {
+            userId: m.sender.id,    // Solo este usuario puede responder
+            chatId: m.chat.id,      // Solo en este chat
+            scope: 'all'            // 'all' | 'private' | 'group'
+        },
+        lifecycle: {
+            consumeOnce: true       // Eliminar después de una respuesta
+        },
+        state: {
+            step: 'name',           // Estado personalizado
+            intentos: 0
+        },
+        routes: [{
+            priority: 1,
+            code: {
+                // guard retorna true para SALTAR esta ruta
+                guard: (m, ctx) => m.body.length < 2,
+                
+                // executor se ejecuta si guard retorna false/undefined
+                executor: async (m, ctx) => {
+                    await m.reply(`¡Hola ${m.body}!`)
+                }
+            }
+        }]
+    }, 1000 * 60 * 5)  // Expira en 5 minutos
+}
+```
+
+**Parámetros de `setReplyHandler`:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `message` | Object | Mensaje al que se responderá (debe tener `key.id`) |
+| `options.security.userId` | String | `'all'` o JID específico |
+| `options.security.chatId` | String | `'all'` o JID específico |
+| `options.security.scope` | String | `'all'`, `'private'`, `'group'` |
+| `options.lifecycle.consumeOnce` | Boolean | Eliminar tras primera ejecución |
+| `options.state` | Object | Estado personalizado accesible en rutas |
+| `options.routes` | Array | Rutas ordenadas por `priority` |
+| `expiresIn` | Number | Milisegundos hasta expiración |
+
+---
+
+## Ejemplos de Uso
+
+### Ejemplo 1: Comando con Verificación de Roles
+
+```javascript
+// plugins/admin/ban.plugin.js
+
+export default {
+    case: 'ban',
+    usePrefix: true,
+    command: true,
+    
+    async script(m, { sock }) {
+        // Verificar que el ejecutor sea moderador o superior
+        if (!m.sender.role('root', 'owner', 'mod')) {
+            return m.sms('mod')
+        }
+        
+        // Verificar que haya un usuario mencionado o citado
+        const target = m.sender.mentioned[0] || m.quoted?.sender.id
+        if (!target) {
+            return m.reply('Menciona o cita al usuario a banear')
+        }
+        
+        // Banear usuario
+        await m.setBan(target, true)
+        await m.reply(`Usuario @${target.split('@')[0]} baneado.`)
+    }
+}
+```
+
+### Ejemplo 2: Descarga de Media
+
+```javascript
+// plugins/media/sticker.plugin.js
+
+export default {
+    case: ['sticker', 's'],
+    usePrefix: true,
+    command: true,
+    
+    async script(m, { sock }) {
+        // Verificar si hay imagen en el mensaje o citada
+        const media = m.content.media || m.quoted?.content.media
+        
+        if (!media || !media.mimeType.startsWith('image/')) {
+            return m.reply('Envía o cita una imagen')
+        }
+        
+        await m.react('wait')
+        
+        try {
+            const buffer = await media.download()
+            
+            await sock.sendMessage(m.chat.id, {
+                sticker: buffer
+            }, { quoted: m.message })
+            
+            await m.react('done')
+        } catch (e) {
+            await m.react('error')
+            await m.reply('Error al crear el sticker')
+        }
+    }
+}
+```
+
+### Ejemplo 3: Plugin Before (Middleware Anti-Spam)
+
+```javascript
+// plugins/middleware/antispam.plugin.js
+
 const cooldowns = new Map();
 const COOLDOWN_MS = 3000;
 
 export default {
     before: true,
     index: 1,
+    priority: 5,
     
-    script: async (m, { control }) => {
+    async script(m, { control }) {
+        // Ignorar al bot
+        if (m.sender.roles.bot) return
+        
+        // Ignorar admins/owners
+        if (m.sender.role('root', 'owner', 'mod')) return
+        
         const key = m.sender.id;
         const now = Date.now();
         
         if (cooldowns.has(key)) {
             const lastTime = cooldowns.get(key);
             if (now - lastTime < COOLDOWN_MS) {
-                control.end = true;
+                control.end = true;  // Detiene el pipeline
                 return;
             }
         }
@@ -602,416 +976,48 @@ export default {
 }
 ```
 
-### 3.5.3 Plugin de Evento (Bienvenida)
+### Ejemplo 4: Plugin de Evento (Bienvenida)
 
 ```javascript
-// plugins/bienvenida.plugin.js
+// plugins/events/bienvenida.plugin.js
+
 export default {
     case: 'GROUP_PARTICIPANT_ADD',
     stubtype: true,
     
-    script: async (m, { sock, parameters }) => {
+    async script(m, { sock, parameters }) {
         const newMember = parameters[0];
         const groupName = m.chat.name || 'el grupo';
         
         await sock.sendMessage(m.chat.id, {
-            text: `Bienvenido/a al grupo ${groupName}, @${newMember.split('@')[0]}`,
+            text: `¡Bienvenido/a a *${groupName}*, @${newMember.split('@')[0]}! 🎉`,
             mentions: [newMember]
         });
     }
 }
 ```
 
-## 3.6 Sistema de Exportación entre Plugins
+### Ejemplo 5: Sistema de Economía Completo
 
-Los plugins pueden exportar y consumir funcionalidades compartidas:
+Este ejemplo demuestra un sistema completo con persistencia, roles, exportación entre plugins y flujos interactivos.
 
-```javascript
-// plugins/utilidades.plugin.js
-export default {
-    before: true,
-    index: 1,
-    
-    export: {
-        formatearNumero: (numero) => {
-            return numero.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        },
-        
-        validarUrl: (texto) => {
-            try {
-                new URL(texto);
-                return true;
-            } catch {
-                return false;
-            }
-        }
-    },
-    
-    script: async (m) => {
-        // Plugin mínimo, solo exporta
-    }
-}
-```
-
-Consumo desde otro plugin:
-
-```javascript
-// plugins/estadisticas.plugin.js
-export default {
-    case: 'stats',
-    command: true,
-    
-    script: async (m, { plugin }) => {
-        const utils = plugin.import('formatearNumero');
-        const mensajes = 1500000;
-        
-        await m.reply(`Mensajes procesados: ${utils(mensajes)}`);
-        // Output: "Mensajes procesados: 1,500,000"
-    }
-}
-```
-
----
-
-# 4. Sistema de Persistencia
-
-## 4.1 Arquitectura del Módulo db.js
-
-El sistema de persistencia implementa un almacén JSON con las siguientes características:
-
-- Almacenamiento en archivos JSON individuales
-- Índice centralizado para mapeo nombre → archivo
-- Caché en memoria con TTL de 60 segundos
-- Escritura diferida (lazy write)
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                       SISTEMA DE PERSISTENCIA                          │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                        │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                         MEMORIA                                 │   │
-│  │  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     │   │
-│  │  │  $data.bases │     │$data.timeouts│     │ $data.index  │     │   │
-│  │  │    (Map)     │     │    (Map)     │     │   (Object)   │     │   │
-│  │  └──────┬───────┘     └──────┬───────┘     └──────┬───────┘     │   │
-│  │         │                    │                    │             │   │
-│  └─────────┼────────────────────┼────────────────────┼─────────────┘   │
-│            │                    │                    │                 │
-│            │         TTL: 60s   │                    │                 │
-│            │         ┌──────────┘                    │                 │
-│            │         │                               │                 │
-│            ▼         ▼                               ▼                 │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      SISTEMA DE ARCHIVOS                        │   │
-│  │                                                                 │   │
-│  │  storage/store/                                                 │   │
-│  │  ├── index.json          { "@users": { "id": "A1B2" }, ... }    │   │
-│  │  ├── A1B2.json           { "user1": { ... }, "user2": { ... } } │   │
-│  │  ├── C3D4.json           { ... }                                │   │
-│  │  └── ...                                                        │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-## 4.2 API del Sistema de Persistencia
-
-### 4.2.1 Inicialización
-
-```javascript
-import db from './library/db.js';
-
-// Inicializar con directorio de almacenamiento
-await db.Start('./storage/store');
-```
-
-### 4.2.2 Operaciones CRUD
-
-```javascript
-// Verificar existencia
-const existe = await db.has('@users');
-
-// Abrir o crear base de datos
-const usuarios = await db.open('@users');
-
-// Acceder a datos
-console.log(usuarios.data);
-
-// Modificar datos
-usuarios.data['nuevo_usuario'] = {
-    nombre: 'Usuario',
-    fecha: Date.now()
-};
-
-// Persistir cambios
-await usuarios.update();
-
-// Eliminar base de datos
-await db.delete('@users');
-```
-
-### 4.2.3 Patrones de Uso en Plugins
-
-```javascript
-export default {
-    case: 'registrar',
-    command: true,
-    
-    script: async (m, { sock }) => {
-        const db = await global.db.open('@users');
-        
-        if (db.data[m.sender.id]) {
-            return m.reply('Ya estás registrado.');
-        }
-        
-        db.data[m.sender.id] = {
-            nombre: m.sender.name,
-            registrado: Date.now(),
-            nivel: 1,
-            experiencia: 0
-        };
-        
-        await db.update();
-        await m.reply('Registro completado.');
-    }
-}
-```
-
-## 4.3 Bases de Datos Predefinidas
-
-El Núcleo utiliza convenciones de nomenclatura para bases de datos internas:
-
-| Nombre | Propósito |
-|--------|-----------|
-| `@users` | Datos globales de usuarios |
-| `@chats` | Configuración de chats privados |
-| `@chat:{jid}` | Datos específicos de un grupo |
-| `@reply:Handler` | Reply handlers activos |
-| `@history/{jid}` | Historial de mensajes por chat |
-| `@history/{jid}/{sender}` | Historial por usuario en chat |
-
----
-
-# 5. Gestión de Procesos
-
-## 5.1 Arquitectura Multi-Proceso
-
-El Núcleo implementa una arquitectura de proceso padre-hijo para aislar la lógica del bot de la gestión del proceso, garantizando estabilidad ante fallos críticos.
-
-```javascript
-// 1. PROCESO PADRE (index.js) [Supervisor]
-// Rol: Gestión de ciclo de vida, logs y recuperación de errores.
-Components: ForkManager, IPC Listeners, Console Output.
-
-      ⬇ fork() + Canal IPC (Inter-Process Communication)
-
-// 2. PROCESO HIJO (core/index.js) [Worker]
-// Rol: Ejecución de lógica de negocio, conexión y estado.
-Components: 
-  ├── Baileys Socket (Conexión WhatsApp)
-  ├── Plugins System (Comandos y Eventos)
-  ├── DB System      (Persistencia)
-  └── Handlers       (Pipeline de mensajes)
-```
-## 5.2 Comunicación Inter-Proceso (IPC)
-
-### 5.2.1 Envío de Mensajes desde Proceso Hijo
-
-```javascript
-import $process from './library/process.js';
-
-// Envío simple
-$process.send({
-    content: {
-        type: 'custom:event',
-        data: { mensaje: 'Hola desde el hijo' }
-    }
-});
-
-// Envío con request/response
-const respuesta = await $process.send({
-    content: {
-        type: 'request:data',
-        data: { query: 'info' }
-    }
-}, 'request');
-```
-
-### 5.2.2 Recepción en Proceso Padre
-
-```javascript
-mainBot.event.set('message', async (m) => {
-    const { type, data } = m.content || {};
-    
-    switch (type) {
-        case 'custom:event':
-            console.log('Recibido:', data.mensaje);
-            break;
-    }
-});
-```
-
-## 5.3 Reinicio Automático
-
-El `ForkManager` gestiona automáticamente el reinicio en caso de fallo:
-
-```javascript
-mainBot.event.set('exit', async ({ code, signal }) => {
-    console.log(`Proceso terminado: code=${code}, signal=${signal}`);
-    
-    // Esperar antes de reiniciar
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Reiniciar
-    await mainBot.start();
-});
-```
-
----
-
-# 6. Ejemplos de Implementación
-
-## 6.1 Ejemplo Básico: Bot de Comandos
-
-Este ejemplo implementa un bot con comandos de información y utilidades básicas.
-
-### 6.1.1 Estructura de Archivos
-
-```
-plugins/
-├── info/
-│   ├── ping.plugin.js
-│   ├── menu.plugin.js
-│   └── estado.plugin.js
-└── utilidades/
-    └── sticker.plugin.js
-```
-
-### 6.1.2 Plugin de Ping
-
-```javascript
-// plugins/info/ping.plugin.js
-export default {
-    case: ['ping', 'p'],
-    command: true,
-    usePrefix: true,
-    
-    script: async (m) => {
-        const inicio = Date.now();
-        const mensaje = await m.reply('Calculando latencia...');
-        const latencia = Date.now() - inicio;
-        
-        await m.reply(`Latencia: ${latencia}ms`);
-    }
-}
-```
-
-### 6.1.3 Plugin de Menú Dinámico
-
-```javascript
-// plugins/info/menu.plugin.js
-export default {
-    case: ['menu', 'comandos', 'ayuda'],
-    command: true,
-    usePrefix: true,
-    
-    script: async (m, { plugin }) => {
-        // Obtener todos los plugins de comando
-        const comandos = await plugin.get({ command: true });
-        
-        // Agrupar por carpeta
-        const grupos = {};
-        for (const cmd of comandos) {
-            const carpeta = cmd.fileName.split('/')[0] || 'general';
-            grupos[carpeta] = grupos[carpeta] || [];
-            
-            const cases = Array.isArray(cmd.case) ? cmd.case : [cmd.case];
-            grupos[carpeta].push({
-                comandos: cases,
-                prefijo: cmd.usePrefix !== false
-            });
-        }
-        
-        // Construir mensaje
-        let texto = `*Menú de ${m.bot.name}*\n\n`;
-        
-        for (const [grupo, cmds] of Object.entries(grupos)) {
-            texto += `*${grupo.toUpperCase()}*\n`;
-            for (const cmd of cmds) {
-                const prefijo = cmd.prefijo ? '.' : '';
-                texto += `  ${prefijo}${cmd.comandos.join(' | ')}\n`;
-            }
-            texto += '\n';
-        }
-        
-        await m.reply(texto);
-    }
-}
-```
-
-### 6.1.4 Plugin de Stickers
-
-```javascript
-// plugins/utilidades/sticker.plugin.js
-import fs from 'fs/promises';
-import path from 'path';
-
-export default {
-    case: ['sticker', 's'],
-    command: true,
-    usePrefix: true,
-    
-    script: async (m, { sock }) => {
-        // Verificar que haya imagen
-        let media = m.content.media;
-        
-        if (!media && m.quoted?.content?.media) {
-            media = m.quoted.content.media;
-        }
-        
-        if (!media) {
-            return m.reply('Envía o responde a una imagen con el comando.');
-        }
-        
-        await m.react('wait');
-        
-        try {
-            const buffer = await media.download();
-            
-            await sock.sendMessage(m.chat.id, {
-                sticker: buffer
-            }, { quoted: m.message });
-            
-            await m.react('done');
-        } catch (error) {
-            await m.react('error');
-            await m.reply('Error al crear el sticker.');
-        }
-    }
-}
-```
-
-## 6.2 Ejemplo Avanzado: Sistema de Economía
-
-Este ejemplo demuestra un sistema completo con persistencia, roles y flujos interactivos.
-
-### 6.2.1 Estructura
+#### Estructura de archivos
 
 ```
 plugins/
 └── economia/
-    ├── _init.plugin.js       # Inicialización y exportaciones
+    ├── _init.plugin.js       # Inicialización y exports
     ├── balance.plugin.js     # Consulta de saldo
     ├── daily.plugin.js       # Recompensa diaria
-    ├── transferir.plugin.js  # Transferencias entre usuarios
-    └── tienda.plugin.js      # Sistema de tienda con reply handlers
+    ├── transferir.plugin.js  # Transferencias
+    └── tienda.plugin.js      # Tienda con ReplyHandler
 ```
 
-### 6.2.2 Plugin de Inicialización
+#### Plugin de Inicialización
 
 ```javascript
 // plugins/economia/_init.plugin.js
+
 const MONEDA = '💎';
 const INICIAL = 1000;
 
@@ -1023,6 +1029,7 @@ const obtenerCuenta = async (userId) => {
             balance: INICIAL,
             banco: 0,
             ultimoDaily: 0,
+            streak: 0,
             inventario: [],
             creado: Date.now()
         };
@@ -1036,7 +1043,7 @@ const obtenerCuenta = async (userId) => {
 };
 
 const formatearBalance = (cantidad) => {
-    return `${cantidad.toLocaleString()} ${MONEDA}`;
+    return `${cantidad.toLocaleString('es-ES')} ${MONEDA}`;
 };
 
 export default {
@@ -1044,35 +1051,38 @@ export default {
     index: 1,
     
     export: {
-        obtenerCuenta,
-        formatearBalance,
-        MONEDA,
-        INICIAL
+        '@economia': {
+            obtenerCuenta,
+            formatearBalance,
+            MONEDA,
+            INICIAL
+        }
     },
     
-    script: async () => {}
+    async script() {}
 }
 ```
 
-### 6.2.3 Plugin de Balance
+#### Plugin de Balance
 
 ```javascript
 // plugins/economia/balance.plugin.js
+
 export default {
     case: ['balance', 'bal', 'saldo'],
     command: true,
     usePrefix: true,
     
-    script: async (m, { plugin }) => {
-        const { obtenerCuenta, formatearBalance } = plugin.import('obtenerCuenta');
-        const { cuenta } = await obtenerCuenta(m.sender.id);
+    async script(m, { plugin }) {
+        const eco = plugin.import('@economia');
+        const { cuenta } = await eco.obtenerCuenta(m.sender.id);
         
         const texto = [
-            `*Balance de ${m.sender.name}*`,
+            `*💰 Balance de ${m.sender.name}*`,
             '',
-            `Efectivo: ${formatearBalance(cuenta.balance)}`,
-            `Banco: ${formatearBalance(cuenta.banco)}`,
-            `Total: ${formatearBalance(cuenta.balance + cuenta.banco)}`
+            `├ Efectivo: ${eco.formatearBalance(cuenta.balance)}`,
+            `├ Banco: ${eco.formatearBalance(cuenta.banco)}`,
+            `└ Total: ${eco.formatearBalance(cuenta.balance + cuenta.banco)}`
         ].join('\n');
         
         await m.reply(texto);
@@ -1080,66 +1090,157 @@ export default {
 }
 ```
 
-### 6.2.4 Plugin de Recompensa Diaria
+#### Plugin de Recompensa Diaria
 
 ```javascript
 // plugins/economia/daily.plugin.js
+
 const COOLDOWN = 24 * 60 * 60 * 1000; // 24 horas
 const RECOMPENSA_BASE = 500;
+const BONUS_POR_STREAK = 50;
+const MAX_BONUS = 500;
 
 export default {
     case: ['daily', 'diario'],
     command: true,
     usePrefix: true,
     
-    script: async (m, { plugin }) => {
-        const eco = plugin.import('obtenerCuenta');
+    async script(m, { plugin }) {
+        const eco = plugin.import('@economia');
         const { cuenta, guardar } = await eco.obtenerCuenta(m.sender.id);
         
         const ahora = Date.now();
         const diferencia = ahora - cuenta.ultimoDaily;
         
+        // Verificar cooldown
         if (diferencia < COOLDOWN) {
             const restante = COOLDOWN - diferencia;
             const horas = Math.floor(restante / (60 * 60 * 1000));
             const minutos = Math.floor((restante % (60 * 60 * 1000)) / (60 * 1000));
             
-            return m.reply(`Debes esperar ${horas}h ${minutos}m para tu próxima recompensa.`);
+            return m.reply(`⏰ Debes esperar *${horas}h ${minutos}m* para tu próxima recompensa.`);
         }
         
-        // Calcular recompensa con streak
-        const diasConsecutivos = diferencia < COOLDOWN * 2 
-            ? (cuenta.streak || 0) + 1 
-            : 1;
+        // Calcular streak
+        const dentroDeVentana = diferencia < COOLDOWN * 2;
+        const nuevoStreak = dentroDeVentana ? cuenta.streak + 1 : 1;
         
-        const bonificacion = Math.min(diasConsecutivos * 50, 500);
-        const recompensa = RECOMPENSA_BASE + bonificacion;
+        // Calcular recompensa
+        const bonus = Math.min(nuevoStreak * BONUS_POR_STREAK, MAX_BONUS);
+        const recompensa = RECOMPENSA_BASE + bonus;
         
+        // Actualizar cuenta
         cuenta.balance += recompensa;
         cuenta.ultimoDaily = ahora;
-        cuenta.streak = diasConsecutivos;
+        cuenta.streak = nuevoStreak;
         
         await guardar();
         
         await m.reply([
-            `*Recompensa Diaria*`,
+            `*🎁 Recompensa Diaria*`,
             '',
-            `+${eco.formatearBalance(recompensa)}`,
-            `Racha: ${diasConsecutivos} días`,
-            `Nuevo balance: ${eco.formatearBalance(cuenta.balance)}`
+            `├ Base: ${eco.formatearBalance(RECOMPENSA_BASE)}`,
+            `├ Bonus (x${nuevoStreak}): +${eco.formatearBalance(bonus)}`,
+            `├ Total: ${eco.formatearBalance(recompensa)}`,
+            `└ Nuevo balance: ${eco.formatearBalance(cuenta.balance)}`,
+            '',
+            `🔥 Racha: ${nuevoStreak} día${nuevoStreak > 1 ? 's' : ''}`
         ].join('\n'));
     }
 }
 ```
 
-### 6.2.5 Plugin de Tienda con Reply Handlers
+#### Plugin de Transferencias
+
+```javascript
+// plugins/economia/transferir.plugin.js
+
+const COMISION = 0.05; // 5%
+
+export default {
+    case: ['transferir', 'pay', 'enviar'],
+    command: true,
+    usePrefix: true,
+    
+    async script(m, { plugin }) {
+        const eco = plugin.import('@economia');
+        
+        // Validar destinatario
+        if (m.sender.mentioned.length === 0) {
+            return m.reply([
+                '*📤 Transferir*',
+                '',
+                'Uso: .transferir @usuario <cantidad>',
+                'Ejemplo: .transferir @Juan 1000',
+                '',
+                `Comisión: ${COMISION * 100}%`
+            ].join('\n'));
+        }
+        
+        const destinatarioId = m.sender.mentioned[0];
+        
+        // No transferir a sí mismo
+        if (destinatarioId === m.sender.id) {
+            return m.reply('❌ No puedes transferirte a ti mismo.');
+        }
+        
+        // Validar cantidad
+        const cantidad = parseInt(m.args[1]);
+        if (isNaN(cantidad) || cantidad <= 0) {
+            return m.reply('❌ Especifica una cantidad válida.');
+        }
+        
+        // Obtener cuentas
+        const { cuenta: origen, guardar: guardarOrigen } = 
+            await eco.obtenerCuenta(m.sender.id);
+        const { cuenta: destino, guardar: guardarDestino } = 
+            await eco.obtenerCuenta(destinatarioId);
+        
+        // Calcular comisión
+        const comision = Math.floor(cantidad * COMISION);
+        const total = cantidad + comision;
+        
+        // Validar balance
+        if (origen.balance < total) {
+            return m.reply([
+                '❌ *Balance insuficiente*',
+                '',
+                `├ Cantidad: ${eco.formatearBalance(cantidad)}`,
+                `├ Comisión: ${eco.formatearBalance(comision)}`,
+                `├ Total requerido: ${eco.formatearBalance(total)}`,
+                `└ Tu balance: ${eco.formatearBalance(origen.balance)}`
+            ].join('\n'));
+        }
+        
+        // Ejecutar transferencia
+        origen.balance -= total;
+        destino.balance += cantidad;
+        
+        await guardarOrigen();
+        await guardarDestino();
+        
+        await m.reply([
+            '✅ *Transferencia Exitosa*',
+            '',
+            `├ Enviado: ${eco.formatearBalance(cantidad)}`,
+            `├ Comisión: ${eco.formatearBalance(comision)}`,
+            `├ Destinatario: @${destinatarioId.split('@')[0]}`,
+            `└ Tu nuevo balance: ${eco.formatearBalance(origen.balance)}`
+        ].join('\n'));
+    }
+}
+```
+
+#### Plugin de Tienda con ReplyHandler
 
 ```javascript
 // plugins/economia/tienda.plugin.js
+
 const CATALOGO = [
-    { id: 'vip_1d', nombre: 'VIP 1 Día', precio: 5000, tipo: 'rol' },
-    { id: 'vip_7d', nombre: 'VIP 7 Días', precio: 25000, tipo: 'rol' },
-    { id: 'lootbox', nombre: 'Caja Misteriosa', precio: 1000, tipo: 'item' }
+    { id: 'vip_1d', nombre: '⭐ VIP 1 Día', precio: 5000, tipo: 'rol' },
+    { id: 'vip_7d', nombre: '🌟 VIP 7 Días', precio: 25000, tipo: 'rol' },
+    { id: 'lootbox', nombre: '📦 Caja Misteriosa', precio: 1000, tipo: 'item' },
+    { id: 'titulo_custom', nombre: '🏷️ Título Personalizado', precio: 10000, tipo: 'item' }
 ];
 
 export default {
@@ -1147,21 +1248,28 @@ export default {
     command: true,
     usePrefix: true,
     
-    script: async (m, { sock, plugin }) => {
-        const eco = plugin.import('obtenerCuenta');
+    async script(m, { sock, plugin }) {
+        const eco = plugin.import('@economia');
         const { cuenta } = await eco.obtenerCuenta(m.sender.id);
         
-        let texto = `*Tienda*\n\nTu balance: ${eco.formatearBalance(cuenta.balance)}\n\n`;
+        // Construir catálogo
+        let texto = [
+            `*🛒 Tienda*`,
+            '',
+            `Tu balance: ${eco.formatearBalance(cuenta.balance)}`,
+            ''
+        ].join('\n');
         
         CATALOGO.forEach((item, index) => {
-            texto += `${index + 1}. ${item.nombre} - ${eco.formatearBalance(item.precio)}\n`;
+            texto += `${index + 1}. ${item.nombre}\n`;
+            texto += `   └ ${eco.formatearBalance(item.precio)}\n`;
         });
         
-        texto += '\nResponde con el número del artículo que deseas comprar.';
+        texto += '\n_Responde con el número del artículo que deseas comprar._';
         
         const mensaje = await m.reply(texto);
         
-        // Registrar reply handler
+        // Registrar ReplyHandler
         await sock.setReplyHandler(mensaje, {
             security: {
                 userId: m.sender.id,
@@ -1179,276 +1287,129 @@ export default {
                 {
                     priority: 1,
                     code: {
+                        // Validar entrada
                         guard: (m, ctx) => {
                             const seleccion = parseInt(m.content.text);
                             return isNaN(seleccion) || 
                                    seleccion < 1 || 
                                    seleccion > ctx.state.catalogo.length;
                         },
+                        
+                        // Procesar compra
                         executor: async (m, ctx) => {
                             const seleccion = parseInt(m.content.text) - 1;
                             const item = ctx.state.catalogo[seleccion];
                             
+                            // Obtener cuenta actualizada
                             const db = await global.db.open('@economia');
                             const cuenta = db.data[ctx.state.compradorId];
                             
+                            // Verificar balance
                             if (cuenta.balance < item.precio) {
-                                return m.reply('Balance insuficiente.');
+                                return m.reply([
+                                    '❌ *Balance insuficiente*',
+                                    '',
+                                    `├ Precio: ${item.precio.toLocaleString()} 💎`,
+                                    `└ Tu balance: ${cuenta.balance.toLocaleString()} 💎`
+                                ].join('\n'));
                             }
                             
+                            // Procesar compra
                             cuenta.balance -= item.precio;
                             cuenta.inventario.push({
                                 id: item.id,
+                                nombre: item.nombre,
+                                tipo: item.tipo,
                                 obtenido: Date.now()
                             });
                             
                             await db.update();
                             
-                            await m.reply(
-                                'Compra exitosa: ' + item.nombre + 
-                                '\\nNuevo balance: ' + cuenta.balance
-                            );
+                            await m.reply([
+                                '✅ *Compra Exitosa*',
+                                '',
+                                `├ Artículo: ${item.nombre}`,
+                                `├ Precio: ${item.precio.toLocaleString()} 💎`,
+                                `└ Nuevo balance: ${cuenta.balance.toLocaleString()} 💎`
+                            ].join('\n'));
+                        }
+                    }
+                },
+                {
+                    priority: 2,
+                    code: {
+                        // Ruta por defecto si guard anterior fue true
+                        executor: async (m) => {
+                            await m.reply('❌ Opción no válida. Escribe un número del 1 al ' + CATALOGO.length);
                         }
                     }
                 }
             ]
-        }, 1000 * 60 * 5); // 5 minutos de expiración
+        }, 1000 * 60 * 2); // 2 minutos
     }
 }
 ```
 
-### 6.2.6 Plugin de Transferencias
+---
+
+## Edge Cases y Consideraciones
+
+### Manejo de Errores en Plugins
+
+Los errores dentro de `plugin.script()` son capturados automáticamente. El bot:
+1. Reacciona con ❌ (`react('error')`)
+2. Envía un mensaje con el stack trace al chat
+3. Continúa procesando otros mensajes
+
+### Mutabilidad del Objeto m
+
+El objeto `m` es mutable. Las modificaciones persisten a lo largo del pipeline:
 
 ```javascript
-// plugins/economia/transferir.plugin.js
+// Plugin before:index=2
 export default {
-    case: ['transferir', 'pay', 'enviar'],
+    before: true,
+    index: 2,
+    script: async (m) => {
+        m.customFlag = true;
+        m.sender.roles.customRole = true;
+    }
+}
+
+// Plugin de comando posterior
+export default {
+    case: 'test',
     command: true,
-    usePrefix: true,
-    
-    script: async (m, { plugin }) => {
-        const eco = plugin.import('obtenerCuenta');
-        
-        // Validar argumentos
-        if (m.sender.mentioned.length === 0) {
-            return m.reply('Menciona al usuario destinatario.\nEjemplo: .transferir @usuario 1000');
-        }
-        
-        const cantidad = parseInt(m.args[1]);
-        if (isNaN(cantidad) || cantidad <= 0) {
-            return m.reply('Especifica una cantidad válida.');
-        }
-        
-        const destinatarioId = m.sender.mentioned[0];
-        
-        if (destinatarioId === m.sender.id) {
-            return m.reply('No puedes transferirte a ti mismo.');
-        }
-        
-        // Obtener cuentas
-        const { cuenta: origen, guardar: guardarOrigen } = await eco.obtenerCuenta(m.sender.id);
-        const { cuenta: destino, guardar: guardarDestino } = await eco.obtenerCuenta(destinatarioId);
-        
-        // Validar balance
-        if (origen.balance < cantidad) {
-            return m.reply(`Balance insuficiente. Tienes ${eco.formatearBalance(origen.balance)}`);
-        }
-        
-        // Ejecutar transferencia
-        origen.balance -= cantidad;
-        destino.balance += cantidad;
-        
-        await guardarOrigen();
-        await guardarDestino();
-        
-        await m.reply([
-            '*Transferencia Exitosa*',
-            '',
-            `Enviado: ${eco.formatearBalance(cantidad)}`,
-            `Destinatario: @${destinatarioId.split('@')[0]}`,
-            `Tu nuevo balance: ${eco.formatearBalance(origen.balance)}`
-        ].join('\n'));
+    script: async (m) => {
+        console.log(m.customFlag);           // true
+        console.log(m.sender.roles.customRole); // true
     }
 }
 ```
 
----
+### Límites de la Base de Datos
 
-# 7. Referencia de API
+- Las bases inactivas por 60s se descargan de memoria
+- Escrituras se agrupan cada 5 segundos o cada 5 llamadas a `update()`
+- No hay límite de tamaño, pero archivos JSON grandes impactan rendimiento
 
-## 7.1 Objeto sock (Socket Extendido)
+### Historial de Mensajes
 
-### 7.1.1 Métodos Heredados de Baileys
+Si `saveHistory: true`:
+- Se almacenan los últimos 50 mensajes por usuario por grupo
+- Se puede recuperar un mensaje con `sock.loadMessage(jid, id)`
 
-Todos los métodos de `@whiskeysockets/baileys` están disponibles. Referencia completa en la documentación oficial de Baileys.
+### Reconexión Automática
 
-### 7.1.2 Métodos Inyectados por el Núcleo
-
-```javascript
-// Descargar media de un mensaje
-sock.downloadMedia(message: Object, type?: 'buffer' | 'stream') => Promise<Buffer>
-
-// Enviar mensaje con contenido generado
-sock.sendWAMContent(jid: String, message: Object, options?: Object) => Promise<Object>
-
-// Registrar un reply handler
-sock.setReplyHandler(
-    message: Object,           // Mensaje al que se responderá
-    options: {
-        security?: {
-            userId?: String,   // 'all' o JID específico
-            chatId?: String,   // 'all' o JID específico
-            scope?: String     // 'all' | 'private' | 'group'
-        },
-        lifecycle?: {
-            consumeOnce?: Boolean,  // Eliminar tras primera respuesta
-            expiresAt?: Number      // Timestamp de expiración
-        },
-        state?: Object,        // Estado personalizado
-        routes: Array<{
-            priority: Number,
-            code: {
-                guard?: String,    // Función como string
-                executor: String   // Función como string
-            }
-        }>
-    },
-    expiresIn?: Number         // Milisegundos hasta expiración
-) => Promise<void>
-
-// Cargar mensaje del historial
-sock.loadMessage(jid: String, messageId: String) => Promise<Object | null>
-```
-
-## 7.2 Clase Plugins
-
-```javascript
-// Verificar si existe un plugin
-plugins.has(fileName: String) => Boolean
-
-// Eliminar un plugin del registro
-plugins.delete(fileName: String) => Boolean
-
-// Importar exportación de un plugin
-plugins.import(key: String) => any
-
-// Exportar funcionalidad
-plugins.export(key: String, value: any) => any
-
-// Cargar plugins del directorio
-plugins.load() => Promise<void>
-
-// Registrar un plugin manualmente
-plugins.set(fileName: String) => Promise<void>
-
-// Consultar plugins
-plugins.query(query: Object | String) => Promise<Array<Plugin>>
-```
-
-## 7.3 Módulo db (Persistencia)
-
-```javascript
-import db from './library/db.js';
-
-// Inicializar sistema
-db.Start(folderPath: String) => Promise<db>
-
-// Verificar existencia
-db.has(name: String) => Promise<Boolean>
-
-// Abrir base de datos
-db.open(name: String) => Promise<{
-    data: Object,
-    update: () => Promise<Boolean>
-}>
-
-// Eliminar base de datos
-db.delete(name: String) => Promise<Boolean>
-```
-
-## 7.4 Clase ForkManager
-
-```javascript
-import { ForkManager } from './library/fork.js';
-
-const manager = new ForkManager(filePath: String, options: {
-    execArgv?: Array<String>,
-    cwd?: String,
-    serialization?: 'json' | 'advanced',
-    env: Object
-});
-
-// Registrar evento
-manager.event.set(name: 'message' | 'error' | 'exit', handler: Function) => Boolean
-
-// Eliminar evento
-manager.event.delete(name: String) => Boolean
-
-// Iniciar proceso
-manager.start(callback?: Function) => Promise<void>
-
-// Detener proceso
-manager.stop(callback?: Function) => Promise<void>
-
-// Enviar mensaje
-manager.send(content: Object, type?: 'send' | 'request') => Promise<void | Object>
-
-// Estado del proceso
-manager.status => { process: ChildProcess }
-
-// Tiempo activo
-manager.uptime => Number | null
-```
-
-## 7.5 Utilidades
-
-### 7.5.1 SimpleTimer
-
-```javascript
-import { SimpleTimer } from './library/utils.js';
-
-const timer = new SimpleTimer(
-    callback: Function,
-    duration: Number,
-    type?: 'timeout' | 'interval'
-);
-
-timer.start() => void
-timer.stop() => void
-timer.status => Boolean
-```
-
-### 7.5.2 TmpStore
-
-```javascript
-import { TmpStore } from './library/utils.js';
-
-const store = new TmpStore(ttl?: Number);  // Default: 60000ms
-
-store.set(key: String, value: any) => Promise<any>
-store.get(key: String) => any
-store.has(key: String) => Boolean
-store.delete(key: String) => Boolean
-store.clear() => void
-store.keys() => Array<String>
-store.values() => Array<any>
-```
-
-### 7.5.3 Color (Terminal)
-
-```javascript
-import { color } from './library/utils.js';
-
-color.rgb(r: Number, g: Number, b: Number) => String  // Texto
-color.bg.rgb(r: Number, g: Number, b: Number) => String  // Fondo
-color.reset => String
-```
+El bot se reconecta automáticamente excepto en caso de `loggedOut`, donde es necesario re-autenticar eliminando `/storage/creds/`.
 
 ---
 
-# Apéndice A: Eventos StubType Soportados
+## Apéndices
 
-Lista parcial de eventos de `WebMessageInfo.StubType` que pueden capturarse con plugins `stubtype: true`:
+### Apéndice A: Eventos StubType
+
+Lista de eventos de `WebMessageInfo.StubType` que pueden capturarse con plugins `stubtype: true`:
 
 | Evento | Descripción |
 |--------|-------------|
@@ -1456,29 +1417,72 @@ Lista parcial de eventos de `WebMessageInfo.StubType` que pueden capturarse con 
 | `GROUP_PARTICIPANT_REMOVE` | Usuario eliminado del grupo |
 | `GROUP_PARTICIPANT_LEAVE` | Usuario abandonó el grupo |
 | `GROUP_PARTICIPANT_PROMOTE` | Usuario promovido a admin |
-| `GROUP_PARTICIPANT_DEMOTE` | Admin degradado |
+| `GROUP_PARTICIPANT_DEMOTE` | Admin degradado a miembro |
 | `GROUP_CHANGE_SUBJECT` | Nombre del grupo cambiado |
-| `GROUP_CHANGE_DESCRIPTION` | Descripción cambiada |
-| `GROUP_CHANGE_ICON` | Icono del grupo cambiado |
+| `GROUP_CHANGE_DESCRIPTION` | Descripción del grupo cambiada |
+| `GROUP_CHANGE_ICON` | Foto del grupo cambiada |
 | `GROUP_CHANGE_INVITE_LINK` | Link de invitación regenerado |
 | `GROUP_CHANGE_RESTRICT` | Configuración de restricción cambiada |
-| `GROUP_CHANGE_ANNOUNCE` | Modo solo admins cambiado |
+| `GROUP_CHANGE_ANNOUNCE` | Modo solo admins activado/desactivado |
+| `GROUP_PARTICIPANT_INVITE` | Usuario invitado al grupo |
+| `GROUP_CREATE` | Grupo creado |
+| `BROADCAST_CREATE` | Lista de difusión creada |
+| `BROADCAST_ADD` | Añadido a lista de difusión |
+| `BROADCAST_REMOVE` | Eliminado de lista de difusión |
+| `CALL_MISSED_VOICE` | Llamada de voz perdida |
+| `CALL_MISSED_VIDEO` | Videollamada perdida |
 
----
+**Ejemplo de uso:**
 
-# Apéndice B: Variables Globales
+```javascript
+export default {
+    case: 'GROUP_PARTICIPANT_LEAVE',
+    stubtype: true,
+    
+    async script(m, { parameters }) {
+        const usuario = parameters[0];
+        await m.reply(`👋 @${usuario.split('@')[0]} ha abandonado el grupo.`);
+    }
+}
+```
+
+### Apéndice B: Variables Globales
 
 | Variable | Tipo | Descripción |
 |----------|------|-------------|
-| `global.config` | Object | Configuración principal |
-| `global.config.prefixes` | String | Caracteres de prefijo válidos |
+| `global.config` | Object | Configuración principal del bot |
+| `global.config.name` | String | Nombre del bot |
+| `global.config.prefixes` | String | Caracteres válidos como prefijo |
+| `global.config.saveHistory` | Boolean | Guardar historial de mensajes |
+| `global.config.autoRead` | Boolean | Marcar mensajes como leídos |
 | `global.config.userRoles` | Object | Roles predefinidos por número |
 | `global.db` | Object | Instancia del sistema de persistencia |
 | `global.sock` | Object | Socket de Baileys (disponible tras conexión) |
-| `global.REACT_EMOJIS` | Object | Mapeo de alias a emojis |
+| `global.REACT_EMOJIS` | Object | Mapeo de alias a emojis (`wait`, `done`, `error`) |
 | `global.MSG` | Object | Mensajes de sistema predefinidos |
+| `global.PLUGINS_MSG` | Object | Mensajes de gestión de plugins |
 | `global.$proto` | Object | Protobuf de WhatsApp |
+| `global.$package` | Object | Contenido de package.json |
 | `global.$dir_main` | Object | Rutas de directorios principales |
-| `global.readMore` | String | Carácter invisible para "leer más" |
+| `global.$dir_bot` | Object | Rutas adicionales del bot |
+| `global.readMore` | String | Carácter invisible para "leer más" (850 repeticiones) |
+| `global.googleApiKey` | String | API Key de Google (desde .env) |
 
+**Ejemplo de acceso:**
+
+```javascript
+export default {
+    case: 'info',
+    command: true,
+    
+    async script(m) {
+        await m.reply([
+            `*${global.config.name}*`,
+            `Versión: ${global.$package.version}`,
+            `Prefijos: ${global.config.prefixes}`,
+            `Historial: ${global.config.saveHistory ? 'Sí' : 'No'}`
+        ].join('\n'));
+    }
+}
+```
 ---
