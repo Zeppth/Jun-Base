@@ -61,7 +61,7 @@ const $data = {
 };
 
 export default {
-    async Start($folder) {
+    async start($folder) {
         if (!$folder) return $res.error('Folder path not set');
         $data.folder = await folder($folder || './data');
         $data.index = await $data.index();
