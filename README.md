@@ -162,7 +162,7 @@ storage/
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                              PROCESO PRINCIPAL                          │
 │  index.js                                                               │
-│  └─> ForkManager ──fork()──> core/index.js (PROCESO HIJO)              │
+│  └─> ForkManager ──fork()──> core/index.js (PROCESO HIJO)               │
 │          │                        │                                     │
 │          │ IPC                    ├─> Baileys WebSocket                 │
 │          │ (process.send)         ├─> Plugin Watcher                    │
@@ -702,7 +702,7 @@ interface MessageContext {
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                         EJECUCIÓN                               │   │
 │  │                                                                 │   │
-│  │  messages.upsert → core.handler → plugins.query() → script()   │   │
+│  │  messages.upsert → core.handler → plugins.query() → script()    │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
