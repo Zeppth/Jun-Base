@@ -25,7 +25,7 @@ try {
     await import('../library/purge.js')
 
     const { data, path: _path } = $process.env
-    await $base.Start($process.env.path.store)
+    await $base.start($process.env.path.store)
 
     await handlerLoader.loadFiles();
 
