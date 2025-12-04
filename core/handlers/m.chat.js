@@ -44,7 +44,7 @@ export default async ({ m, sock, cached, message }) => {
             m.chat.db = async () => {
                 const data = await $base.open('@chat:' + m.chat.id)
                 return {
-                    data: db.data,
+                    data: data.data,
                     _data: data.data,
                     update: async () => {
                         await data.update()
@@ -60,7 +60,7 @@ export default async ({ m, sock, cached, message }) => {
                 const data = await $base.open('@users')
                 return {
                     _data: data.data,
-                    data: db.data[m.chat.id],
+                    data: data.data[m.chat.id],
                     update: async () => {
                         await data.update()
                     }
