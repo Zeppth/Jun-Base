@@ -89,11 +89,11 @@ export default async ({ m, sock, message }) => {
             text: quoted_content_text || '',
             args: quoted_content_text?.trim().split(/ +/),
             media: (
-                quoted.message.imageMessage
-                || quoted.message.videoMessage
-                || quoted.message.stickerMessage
-                || quoted.message.documentMessage
-                || quoted.message.audioMessage
+                quoted.message?.imageMessage
+                || quoted.message?.videoMessage
+                || quoted.message?.stickerMessage
+                || quoted.message?.documentMessage
+                || quoted.message?.audioMessage
             ) ? {
                 mimeType: quoted.message?.[m.quoted.type]?.mimetype || '',
                 fileName: quoted.message?.[m.quoted.type]?.filename || '',
