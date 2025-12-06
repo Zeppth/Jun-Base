@@ -43,7 +43,7 @@ export default async ({ m, sock, message }) => {
     if (contextInfo.quotedMessage) {
         if (global.config.saveHistory) {
             m.quoted.message = await sock.loadMessage(
-                m.chat.id, contextInfo.stanzaId)
+                message.key.remoteJid, contextInfo.stanzaId)
         } else {
             m.quoted.message = {}
             m.quoted.message.key = {
