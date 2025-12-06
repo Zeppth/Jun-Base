@@ -19,7 +19,13 @@ export default async ({ m, cached, message, contextInfo }) => {
     }
 
     m.sender.name = m.bot.fromMe ? m.bot.name : message.pushName || '';
-    m.sender.number = (m.sender.id)?.split('@')[0] || undefined;
+
+    if (m.chat.isGroup) {
+        m.sender.number = message.key.participantAlt?.split('@')[0] || undefined;
+    } else {
+        m.sender.number = message.key.remoteJid?.split('@')[0] || undefined;
+    }
+
     m.sender.user = '@' + m.sender.id?.split('@')[0] || undefined;
     m.sender.roles.bot = m.bot.id === m.sender.id;
 
