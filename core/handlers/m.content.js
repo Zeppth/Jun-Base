@@ -41,10 +41,14 @@ export default async ({ m, sock, message }) => {
     // QUOTED
 
     if (contextInfo.quotedMessage) {
+        m.quoted = {};
+
         if (global.config.saveHistory) {
             m.quoted.message = await sock.loadMessage(
                 message.key.remoteJid, contextInfo.stanzaId)
-        } else {
+        }
+
+        if (!m.quoted.message) {
             m.quoted.message = {}
             m.quoted.message.key = {
                 remoteJid: contextInfo.remoteJid || message.key.remoteJid,
@@ -59,7 +63,7 @@ export default async ({ m, sock, message }) => {
 
 
         const quoted = m.quoted.message
-        m.quoted = { id: quoted.key.id }
+        m.quoted.id = quoted.key.id
 
         m.quoted.type = (() => {
             for (const type of Object.keys({
@@ -76,7 +80,7 @@ export default async ({ m, sock, message }) => {
         })()
 
         m.quoted.type ||= Object.keys(quoted.message)[0]
-        
+
         const quoted_content_text = await (async () => {
             try {
                 const fun = messageExtractors[m.quoted.type]
