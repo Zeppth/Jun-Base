@@ -233,61 +233,6 @@ SimpleBase-1.2.5/
     └── temp/
 ```
 
-### Pipeline de Mensajes
-
-El archivo `core.handler.js` orquesta el flujo de procesamiento:
-
-```
-1. MENSAJE ENTRANTE (messages.upsert)
-        │
-        ▼
-2. EXTRACCIÓN DE CONTENIDO (m.content.js)
-   └─> Determina tipo: conversation, imageMessage, videoMessage, etc.
-   └─> Extrae texto, media, contextInfo
-        │
-        ▼
-3. CONSTRUCCIÓN DEL CONTEXTO
-   ├─> m.bot.js      → Información del bot
-   ├─> m.chat.js     → Información del chat
-   ├─> m.sender.js   → Información del remitente + roles
-   └─> m.assign.js   → Métodos: reply(), react(), sms()
-        │
-        ▼
-4. PLUGINS BEFORE (index: 1)
-   └─> Plugins con `before: true, index: 1` se ejecutan primero
-   └─> Pueden detener el flujo con `control.end = true`
-        │
-        ▼
-5. VERIFICACIÓN DE BANS
-   └─> Usuarios/chats baneados son ignorados
-        │
-        ▼
-6. METADATA DE GRUPO (si aplica)
-   └─> m.chat.group.js → participantes, admins, nombre, descripción
-        │
-        ▼
-7. STUBTYPE EVENTS (si message.messageStubType)
-   └─> Eventos de grupo: añadir/remover participantes, cambiar nombre, etc.
-        │
-        ▼
-8. PLUGINS BEFORE (index: 2)
-        │
-        ▼
-9. PARSING DEL COMANDO (m.parser.js)
-   └─> Detecta prefijo, extrae comando, busca plugin correspondiente
-        │
-        ▼
-10. REPLY HANDLER (m.pre.parser.js)
-    └─> Si es respuesta a un mensaje con handler registrado
-        │
-        ▼
-11. PLUGINS BEFORE (index: 3)
-        │
-        ▼
-12. EJECUCIÓN DEL PLUGIN
-    └─> plugin.script(m, { sock, plugin, store })
-```
-
 ### Disponibilidad de Propiedades por Index
 
 El objeto `m` se construye progresivamente. Acceder a propiedades antes de su inicialización produce `undefined`. La siguiente tabla muestra qué propiedades están disponibles en cada punto del pipeline:
