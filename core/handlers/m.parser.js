@@ -15,7 +15,8 @@ export default async ({ m, sock }) => {
     m.text = m.args.length > 0 ? m.args.join(" ") : m.body;
 
     const Prefix = global.config.prefixes;
-    
+
+    // usePrefix = true
     if (Prefix && Prefix.includes(m.body[0])) {
 
         m.command = m.body.substring(1).trim()
@@ -30,25 +31,34 @@ export default async ({ m, sock }) => {
         m.isCmd = plugin[0] ? true : false;
         m.plugin = plugin[0] ?? null;
 
-        if (!m.isCmd) {
-            m.command = m.body.trim()
-                .split(/ +/)[0].toLowerCase()
+    }
 
-            const plugin = await sock.plugins.query({
-                case: m.command,
-                usePrefix: false,
-                command: true,
-            })
-            m.isCmd = plugin[0] ? true : false;
-            m.plugin = plugin[0] ?? null;
-        }
-    } else {
+    // usePrefix = false
+    else if (Prefix && !Prefix.includes(m.body[0])) {
+
         m.command = m.body.trim()
             .split(/ +/)[0].toLowerCase()
+
+        const plugin = await sock.plugins.query({
+            case: m.command,
+            usePrefix: false,
+            command: true,
+        })
+
+        m.isCmd = plugin[0] ? true : false;
+        m.plugin = plugin[0] ?? null;
+    }
+
+    // Prefix = undefined
+    else if (!Prefix) {
+        m.command = m.body.trim()
+            .split(/ +/)[0].toLowerCase()
+
         const plugin = await sock.plugins.query({
             case: m.command,
             command: true
         })
+
         m.isCmd = plugin[0] ? true : false;
         m.plugin = plugin[0] ?? null;
     }
