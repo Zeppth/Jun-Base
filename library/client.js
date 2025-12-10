@@ -50,13 +50,6 @@ export async function MakeBot(conn = {
             keys: makeCacheableSignalKeyStore(state.keys,
                 pino({ level: "fatal" }).child({ level: "fatal" }))
         },
-        getMessage: async key => {
-            if (store) {
-                const msg = await store.loadMessage(key.remoteJid, key.id)
-                return msg.message || undefined
-            }
-            return { conversation: "hello" }
-        },
         patchMessageBeforeSending: (message) => {
             const UintArray = (numero) => Uint8Array
                 .from(randomBytes(numero));
@@ -104,4 +97,5 @@ export async function MakeBot(conn = {
     } else {
         return { ...sock, state, store, proto }
     }
+
 }
