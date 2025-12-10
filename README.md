@@ -14,7 +14,6 @@ Framework modular para bots de WhatsApp construido sobre `@whiskeysockets/bailey
 - [Arquitectura y Lógica](#arquitectura-y-lógica)
   - [Diagrama de Flujo](#diagrama-de-flujo)
   - [Estructura de Directorios](#estructura-de-directorios)
-  - [Pipeline de Mensajes](#pipeline-de-mensajes)
   - [Disponibilidad de Propiedades por Index](#disponibilidad-de-propiedades-por-index)
 - [Referencia de API](#referencia-de-api)
   - [Core Modules](#core-modules)
