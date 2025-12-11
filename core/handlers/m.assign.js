@@ -36,8 +36,10 @@ export default async function ({ m, sock, message }) {
         m.reply = async (text) => {
             if (typeof text == 'string') {
                 const mentionedJid = (text.match(/@(\d{0,16})/g) || []).map(v => v.slice(1) + '@lid');
-                return await sock.sendMessage(m.chat.id, { text: text, contextInfo: { mentionedJid } }, { quoted: message });
-            } else if (typeof text == 'object') return await sock.sendMessage(m.chat.id, text, { quoted: message });
+                return sock.sendMessage(m.chat.id, { text: text, contextInfo: { mentionedJid }, text: text },
+                    (message && !message.messageStubType) ? { quoted: message } : {});
+            } else if (typeof text == 'object') return sock.sendMessage(m.chat.id, text,
+                (message && !message.messageStubType) ? { quoted: message } : {});
             else return new Error('[E]: m.reply(string ?)')
         }
 
