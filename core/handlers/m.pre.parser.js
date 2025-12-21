@@ -51,10 +51,11 @@ export default async ({ m, sock }) => {
             ? eval(route.code.executor) : null;
 
         if (typeof guard == 'function') {
-            if (!!(await guard(m, {
+            const o = await guard(m, {
                 state, lifecycle,
                 security, route, sock
-            }))) continue;
+            })
+            if (!o) continue;
         }
 
         if (lifecycle.consumeOnce) {
@@ -69,4 +70,5 @@ export default async ({ m, sock }) => {
             });
         }
     }
+
 }
