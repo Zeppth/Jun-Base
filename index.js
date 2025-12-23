@@ -9,7 +9,7 @@ import runQuestion from './library/setup.js';
 import { ForkManager } from './library/fork.js';
 
 let _runQuestion = await runQuestion()
-const modulePath = path.resolve('./core/index.js')
+const modulePath = path.resolve('./core/main.js')
 
 async function startMain() {
     const mainBot = new ForkManager(modulePath, {
@@ -18,49 +18,32 @@ async function startMain() {
         serialization: 'json',
         // silent: true,
         env: {
-            dataConfig: { subBot: false, },
             connOptions: { ..._runQuestion }
         }
     })
 
     mainBot.event.set('message', async (m) => {
-        let message = m.content || {}
-        let data = message.data || {}
-        let sender = m.sender || {}
-
-        // event
-        switch (message.event) {
-            case 'pairing:qr-code': {
-                console.log(chalk.rgb(16, 61, 207)('qr code:'));
-                console.log(data.qrCodeText);
-            } break;
-
-            case 'pairing:pin-code': {
-                console.log(chalk.rgb(16, 61, 207)('qr code:'));
-                console.log(data.formattedCode);
-            } break;
-        }
-
-        // type
-        switch (message.type) {
-            case 'connection:open': {
-                console.log(chalk.rgb(70, 209, 70)
-                    ('Connection open:'), {
-                    sender, data: message.data
+        switch (m.type) {
+            case 'open': {
+                console.log(chalk.rgb(70, 209, 70)('Connection open:'), {
+                    ...m.data
                 });
-            } break;
-
-            case 'connection:close': {
-                console.log(chalk.rgb(201, 54, 54)
-                    ('Connection open:'), {
-                    sender, data: message.data
+            } break
+            case 'close': {
+                console.log(chalk.rgb(201, 54, 54)('Connection close:'), {
+                    ...m.data
                 });
-            } break;
-
-            case 'console:log': {
-                console.log('main:Bot', ...data)
-
-            } break;
+            } break
+            case 'pairing': {
+                if (m.event === 'qr-code') {
+                    console.log(chalk.rgb(16, 61, 207)('qr code:'));
+                    console.log(m.data.qrCodeText);
+                }
+                else if (m.event === 'pin-code') {
+                    console.log(chalk.rgb(16, 61, 207)('pin code:'));
+                    console.log(m.data.formattedCode);
+                }
+            }
         }
     });
 
