@@ -1,7 +1,5 @@
 // ./core/handlers/m.assign.js
 
-import logger from '../../library/log.js';
-
 export default async function ({ m, sock, message }) {
     try {
         m.db = async (id) => {
@@ -83,5 +81,5 @@ export default async function ({ m, sock, message }) {
             return m.reply(msg)
         }
 
-    } catch (e) { logger.error(e) }
+    } catch (e) { console.error(e) }
 }

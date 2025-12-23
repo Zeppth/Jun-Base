@@ -5,7 +5,6 @@ import moment from 'moment-timezone';
 import chalk from 'chalk';
 
 // libreria
-import $console from '../../library/log.js';
 import handlerLoader from '../../library/loader.js';
 
 export default async (messages, sock) => {
@@ -70,12 +69,13 @@ export default async (messages, sock) => {
             }
             if (control.end) return;
         } catch (e) {
-            $console.error(e);
+            console.error(e);
         }
 
         // ------
-        if (!sock.subBot && global.config.autoRead)
-            await sock.readMessages([message.key]);
+        if (!sock.subBot && global.config.autoRead) {
+            if (message.message) await sock.readMessages([message.key]);
+        }
 
         /*Banned*/ {
             const user = m.sender.role(
@@ -114,21 +114,18 @@ export default async (messages, sock) => {
                 case: evento,
                 stubtype: true
             })
-            if (plugins[0]) await plugins[0].script(m, {
-                parameters: parameters,
-                plugin: sock.plugins,
-                store: sock.store,
-                even: evento,
-                sock: sock,
-            })
-            else {
-                $console.log(chalk.white('['),
-                    chalk.magenta(moment().tz(Intl.DateTimeFormat()
-                        .resolvedOptions().timeZone).format('HH:mm:ss')).trim(),
-                    chalk.white(']'), chalk.blue('STUBTYPE:'),
-                    chalk.rgb(0, 217, 255).underline(JSON.stringify({
-                        even: evento, parameters: parameters
-                    }, 0, 2)))
+            if (plugins[0]) {
+                console.log(sock.subBot ? (`SubBot: ${chalk.rgb(217, 150, 255).underline(sock.subBotSlot)} Owner: ${chalk.rgb(66, 206, 171).underline(sock.subBotOwnerId)} (${chalk.rgb(0, 217, 255).underline(sock.subBotOwnerName)})\n`) : 'main:Bot', chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue('STUBTYPE:'), chalk.rgb(0, 217, 255).underline(plugins[0].fileName))
+
+                await plugins[0].script(m, {
+                    parameters: parameters,
+                    plugin: sock.plugins,
+                    store: sock.store,
+                    even: evento,
+                    sock: sock,
+                })
+            } else {
+                console.log(sock.subBot ? (`SubBot: ${chalk.rgb(217, 150, 255).underline(sock.subBotSlot)} Owner: ${chalk.rgb(66, 206, 171).underline(sock.subBotOwnerId)} (${chalk.rgb(0, 217, 255).underline(sock.subBotOwnerName)})\n`) : 'main:Bot', chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue('STUBTYPE:'), chalk.rgb(0, 217, 255).underline(JSON.stringify({ even: evento, parameters: parameters }, 0, 2)))
                 continue;
             }
 
@@ -159,13 +156,13 @@ export default async (messages, sock) => {
             }
             if (control.end) return;
         } catch (e) {
-            $console.error(e);
+            console.error(e);
         }
 
         if (!message.message) continue;
         if (!message.message[m.type]) m.type = [0, Object.keys(message.message)[0]]
 
-        $console.log(chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue(`MENSAJE:`), chalk.green('{'), chalk.rgb(255, 131, 0).underline(m.content.text == '' ? (m.type[0] ? m.type : m.type[1]) : m.content.text), chalk.green('}'), chalk.blue('De'), chalk.cyan(m.sender.name), 'Chat', m.chat.isGroup ? chalk.bgGreen('grupo:' + (m.chat.name || m.chat.id)) : chalk.bgRed('Privado:' + m.sender.role('bot') ? 'bot' : m.sender.name || m.sender.id))
+        console.log(sock.subBot ? (`SubBot: ${chalk.rgb(217, 150, 255).underline(sock.subBotSlot)} Owner: ${chalk.rgb(66, 206, 171).underline(sock.subBotOwnerId)} (${chalk.rgb(0, 217, 255).underline(sock.subBotOwnerName)})\n`) : 'main:Bot', chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue(`MENSAJE:`), chalk.green('{'), chalk.rgb(255, 131, 0).underline(m.content.text == '' ? (m.type[0] ? m.type : m.type[1]) : m.content.text), chalk.green('}'), chalk.blue('De'), chalk.cyan(m.sender.name), 'Chat', m.chat.isGroup ? chalk.bgGreen('grupo:' + (m.chat.name || m.chat.id)) : chalk.bgRed('Privado:' + m.sender.role('bot') ? 'bot' : m.sender.name || m.sender.id))
 
         if (!m.type[0]) continue;
 
@@ -201,7 +198,7 @@ export default async (messages, sock) => {
             }
             if (control.end) return;
         } catch (e) {
-            $console.error(e);
+            console.error(e);
         }
 
         try {
@@ -212,7 +209,7 @@ export default async (messages, sock) => {
                     sock: sock,
                 })
         } catch (e) {
-            $console.log(chalk.white('['), chalk.redBright('ERROR'), chalk.white(']'), chalk.redBright('Error:'), util.format(e))
+            console.log(chalk.white('['), chalk.redBright('ERROR'), chalk.white(']'), chalk.redBright('Error:'), util.format(e))
             await m.react('error')
             await sock.sendMessage(m.chat.id, { text: (`*[ Evento - ERROR ]*\n\n- Comando:* ${global.prefix + m.command}\n- Usuario:* wa.me/${m.sender.number}\n- Chat:* ${m.chat.id}\n${global.readMore}\n*\`[ERORR]\`:* ${util.format(e)}\n`) }, { quoted: m.message })
             continue

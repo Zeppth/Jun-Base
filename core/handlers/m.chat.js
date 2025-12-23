@@ -1,6 +1,5 @@
 // ./core/handlers/m.chat.js
-
-import $base from '../../library/db.js';
+const $db = global.db
 
 export default async ({ m, sock, cached, message }) => {
     m.chat = m.chat || {}
@@ -36,13 +35,13 @@ export default async ({ m, sock, cached, message }) => {
 
     try {
         if (m.chat.isGroup) {
-            const db = await $base.open(
+            const db = await $db.open(
                 '@chat:' + m.chat.id)
             db.data.settings ||= {}
             db.data.users ||= {}
 
             m.chat.db = async () => {
-                const data = await $base.open('@chat:' + m.chat.id)
+                const data = await $db.open('@chat:' + m.chat.id)
                 return {
                     data: data.data,
                     _data: data.data,
@@ -52,12 +51,12 @@ export default async ({ m, sock, cached, message }) => {
                 }
             }
         } else {
-            const db = await $base.open('@users')
+            const db = await $db.open('@users')
             db.data[m.chat.id] ||= {}
             await db.update()
 
             m.chat.db = async () => {
-                const data = await $base.open('@users')
+                const data = await $db.open('@users')
                 return {
                     _data: data.data,
                     data: data.data[m.chat.id],

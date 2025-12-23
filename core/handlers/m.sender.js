@@ -1,6 +1,6 @@
 // ./core/handlers/m.sender.js
 
-import $base from '../../library/db.js';
+const $db = global.db
 const userRoles = global.config.userRoles
 
 export default async ({ m, cached, message, contextInfo }) => {
@@ -34,7 +34,7 @@ export default async ({ m, cached, message, contextInfo }) => {
     m.sender.role = async (...array) => array.some(role => m.sender.roles[role]);
     m.sender.mentioned = contextInfo.mentionedJid ?? [];
     m.sender.db = async () => {
-        const data = await $base.open('@users')
+        const data = await $db.open('@users')
         return {
             _data: data,
             data: data.data[m.sender.id],
@@ -45,15 +45,15 @@ export default async ({ m, cached, message, contextInfo }) => {
     }
 
     // store
-    const db = await $base.open('@users')
+    const db = await $db.open('@users')
     const roles = userRoles[m.sender.number]
     const users = db.data
 
     const rol = {
-        root: m.sender.roles.bot ? true : roles?.root || false,
-        owner: m.sender.roles.bot ? true : roles?.owner || false,
-        mod: m.sender.roles.bot ? true : roles?.mod || false,
-        vip: m.sender.roles.bot ? true : roles?.vip || false,
+        root: roles?.root || false,
+        owner: roles?.owner || false,
+        mod: roles?.mod || false,
+        vip: roles?.vip || false,
     }
 
     if (!users[m.sender.id]) {

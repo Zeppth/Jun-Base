@@ -1,9 +1,9 @@
 // ./core/handlers/m.quoted.sender.js
 
-import $base from '../../library/db.js';
+const $db = global.db
 
 export default async ({ m, cached }) => {
-    const db = await $base.open('@users')
+    const db = await $db.open('@users')
     const users = db.data
 
     const quotedMessage = m.quoted.message
@@ -22,7 +22,9 @@ export default async ({ m, cached }) => {
     m.quoted.sender.roles = {
         ...structuredClone(users[m.quoted.sender.id]?.roles || {})
     }
+
     m.quoted.sender.roles.bot = m.bot.id === m.quoted.sender.id;
+    
     m.quoted.sender.role = async (...array) => array
         .some(role => m.quoted.sender.roles[role]);
 

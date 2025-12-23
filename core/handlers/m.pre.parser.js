@@ -1,10 +1,11 @@
 // ./core/handlers/m.pre.parser.js
 
 import lodash from 'lodash';
-import $base from '../../library/db.js';
+
+const $db = global.db
 
 export default async ({ m, sock }) => {
-    const db = await $base.open('@reply:Handler')
+    const db = await $db.open('@reply:Handler')
 
     if (!db.data[m.quoted.id]) return;
     const replyHandler = lodash.cloneDeep(db.data[m.quoted.id])
@@ -63,6 +64,8 @@ export default async ({ m, sock }) => {
             await db.update();
         }
 
+        console.log(executor)
+
         if (typeof executor == 'function') {
             return await executor(m, {
                 state, lifecycle,
@@ -70,5 +73,4 @@ export default async ({ m, sock }) => {
             });
         }
     }
-
 }

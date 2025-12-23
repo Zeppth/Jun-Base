@@ -16,13 +16,30 @@ export default async ({ m, sock }) => {
 
     const Prefix = global.config.prefixes;
 
+    const queryPlugin = async (query) => {
+        let plugin = []
+
+        if (sock.subBot) {
+            plugin = await sock.plugins.query({
+                subBots: true, ...query
+            })
+        }
+
+        if (!plugin[0]) {
+            plugin = await sock.plugins.query({
+                subBots: false, ...query
+            })
+        }
+        return plugin
+    }
+
     // usePrefix = true
     if (Prefix && Prefix.includes(m.body[0])) {
 
         m.command = m.body.substring(1).trim()
             .split(/ +/)[0].toLowerCase()
 
-        const plugin = await sock.plugins.query({
+        const plugin = await queryPlugin({
             case: m.command,
             usePrefix: true,
             command: true,
@@ -39,7 +56,7 @@ export default async ({ m, sock }) => {
         m.command = m.body.trim()
             .split(/ +/)[0].toLowerCase()
 
-        const plugin = await sock.plugins.query({
+        const plugin = await queryPlugin({
             case: m.command,
             usePrefix: false,
             command: true,
@@ -54,9 +71,9 @@ export default async ({ m, sock }) => {
         m.command = m.body.trim()
             .split(/ +/)[0].toLowerCase()
 
-        const plugin = await sock.plugins.query({
+        const plugin = await queryPlugin({
             case: m.command,
-            command: true
+            command: true,
         })
 
         m.isCmd = plugin[0] ? true : false;
