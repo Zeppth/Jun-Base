@@ -1,0 +1,2838 @@
+
+==================================================
+ARCHIVO: config.js
+==================================================
+// ./config.js
+import { color } from './library/utils.js';
+
+import dotenv from 'dotenv';
+dotenv.config();
+
+global.googleApiKey = process.env.GOOGLE_API_KEY || ''
+
+global.readMore = String
+    .fromCharCode(8206)
+    .repeat(850);
+
+
+global.config = {
+    name: "Jun",
+    prefixes: ".¿?¡!#%&/,~@",
+    saveHistory: true,
+    autoRead: true
+};
+
+global.config.userRoles = {
+    "5216678432366": {
+        root: true,
+        owner: true,
+        mod: true,
+        vip: true
+    }
+}
+
+global.REACT_EMOJIS = {
+    wait: "⌛",
+    done: "✔️",
+    error: "✖️"
+}
+
+global.MSG = {
+    root: 'Este comando solo puede ser utilizado por el *dueño*',
+    owner: 'Este comando solo puede ser utilizado por un *propietario*',
+    mod: 'Este comando solo puede ser utilizado por un *moderador*',
+    vip: 'Esta solicitud es solo para usuarios *premium*',
+    group: 'Este comando solo se puede usar en *grupos*',
+    private: 'Este comando solo se puede usar por *chat privado*',
+    admin: 'Este comando solo puede ser usado por los *administradores del grupo*',
+    botAdmin: 'El bot necesita *ser administrador* para usar este comando',
+    unreg: 'Regístrese para usar esta función escribiendo:\n\n.registrar nombre.edad',
+    restrict: 'Esta función está desactivada'
+}
+
+
+global.PLUGINS_MSG = {
+    newPlugin: `${color.bg.rgb(119, 205, 255)}${color.rgb(0, 0, 0)}Nuevo plugin: ${color.rgb(255, 255, 255)}${color.reset}`,
+    updatedPlugin: `${color.bg.rgb(239, 250, 142)}${color.rgb(0, 0, 0)}Recargando plugin: ${color.rgb(255, 255, 255)}${color.reset}`,
+    deletedPlugin: `${color.bg.rgb(241, 114, 114)}${color.rgb(0, 0, 0)}Plugin eliminado: ${color.rgb(255, 255, 255)}${color.reset}`
+}
+
+==================================================
+ARCHIVO: core/config.js
+==================================================
+// ./core/config.js
+
+import path from 'path';
+import fs from 'fs/promises';
+import { JunDB } from '../library/db.js';
+
+const { proto } = (await import('@whiskeysockets/baileys/WAProto/index.js')).default;
+
+global.$package = await fs.readFile(path.resolve('package.json'))
+    .then(data => JSON.parse(data))
+
+global.$dir_main = {
+    plugins: path.resolve('./plugins'),
+    creds: path.resolve('./storage/creds'),
+    store: path.resolve('./storage/store'),
+    temp: path.resolve('./storage/temp'),
+}
+
+global.db = new JunDB();
+global.$proto = proto;
+global.$dir_bot = {}
+
+await global.db.init({
+    folder: global
+        .$dir_main.store,
+    memoryLimit: 15,
+    memoryTTL: 30
+})
+
+==================================================
+ARCHIVO: core/format.js
+==================================================
+// ./core/format.js
+
+const format = {
+    id: String,
+    type: String,
+    message: Object,
+    body: String,
+    command: String,
+    args: Array(String),
+    text: String,
+    tag: Array(String),
+    isCmd: Boolean,
+    plugin: Object,
+
+    bot: Object({
+        id: String,
+        name: String,
+        number: String,
+        fromMe: Boolean,
+        roles: Object({
+            admin: Boolean,
+        }),
+        getDesc: Function,
+        getPhoto: Function,
+        setPhoto: Function,
+        setDesc: Function,
+        setName: Function,
+        join: Function,
+        mute: Function,
+        block: Function,
+        role: Function,
+    }),
+
+    chat: Object({
+        id: String,
+        isGroup: Boolean,
+        name: String,
+        desc: String,
+        size: Number,
+        created: Number,
+        owner: String,
+        participants: Array(Object),
+        admins: Array(String),
+        db: Function,
+        add: Function,
+        remove: Function,
+        promote: Function,
+        demote: Function,
+        getPhoto: Function,
+        setPhoto: Function,
+        setDesc: Function,
+        setName: Function,
+        getCodeInvite: Function,
+        getLinkInvite: Function,
+        revoke: Function,
+        settings: Object({
+            lock: Function,
+            announce: Function,
+        }),
+        getDesc: Function,
+    }),
+
+    sender: Object({
+        id: String,
+        name: String,
+        number: String,
+        roles: Object({
+            rowner: Boolean,
+            owner: Boolean,
+            modr: Boolean,
+            prem: Boolean,
+            admin: Boolean,
+            bot: Boolean,
+        }),
+        mentioned: Array(String),
+        getDesc: Function,
+        getPhoto: Function,
+        role: Function,
+    }),
+
+    content: Object({
+        text: String,
+        args: Array(String),
+        media: Object({
+            mimeType: String,
+            fileName: String,
+            download: Function,
+        }),
+    }),
+
+    quoted: Object({
+        id: String,
+        type: String,
+        sender: Object({
+            id: String,
+            name: String,
+            number: String,
+            roles: Object({
+                rowner: Boolean,
+                owner: Boolean,
+                modr: Boolean,
+                prem: Boolean,
+                bot: Boolean,
+            }),
+            getDesc: Function,
+            getPhoto: Function,
+            role: Function,
+        }),
+        content: Object({
+            text: String,
+            args: Array(String),
+            media: Object({
+                mimeType: String,
+                fileName: String,
+                download: Function,
+            }),
+        }),
+    }),
+
+    reply: Function,
+    react: Function,
+    sms: Function,
+};
+
+export default format;
+
+==================================================
+ARCHIVO: core/handlers/[+] extrator.content.js
+==================================================
+const object = {
+    'conversation': (message) => {
+        return message.message.conversation || ''
+    },
+    'imageMessage': (message) => {
+        return message.message.imageMessage.caption || ''
+    },
+    'videoMessage': (message) => {
+        return message.message.videoMessage.caption || ''
+    },
+    'extendedTextMessage': (message) => {
+        return message.message.extendedTextMessage.text || ''
+    },
+    'buttonsResponseMessage': (message) => {
+        return message.message.buttonsResponseMessage.selectedButtonId || ''
+    },
+    'templateButtonReplyMessage': (message) => {
+        return message.message.templateButtonReplyMessage.selectedId || ''
+    },
+    'interactiveResponseMessage': (message) => {
+        return message.message.interactiveResponseMessage ? (JSON.parse(message
+            .interactiveResponseMessage.nativeFlowResponseMessage.paramsJson)).id || '' : ''
+    },
+}
+
+export default object
+
+==================================================
+ARCHIVO: core/handlers/core.handler.js
+==================================================
+// ./core/handlers/core.handler.js
+
+import util from 'util';
+import moment from 'moment-timezone';
+import chalk from 'chalk';
+
+// libreria
+import handlerLoader from '../../library/loader.js';
+
+export default async (messages, sock) => {
+    const m_Bot = handlerLoader.get('m.bot.js');
+    const m_Chat = handlerLoader.get('m.chat.js');
+    const cache = handlerLoader.get('m.cache.js');
+    const m_assign = handlerLoader.get('m.assign.js');
+    const m_Sender = handlerLoader.get('m.sender.js');
+    const m_Content = handlerLoader.get('m.content.js');
+    const m_QuotedSender = handlerLoader.get('m.quoted.sender.js');
+    const m_ChatGroup = handlerLoader.get('m.chat.group.js');
+    const m_PreParser = handlerLoader.get('m.pre.parser.js');
+    const m_Parser = handlerLoader.get('m.parser.js');
+
+    const cached = cache.default({ sock })
+
+    for (const message of messages.messages) {
+        if (!message.key) continue;
+
+        const m = { id: message.key.id }
+        m.message = message
+        m.cache = cached
+
+        // message content
+        const {
+            contextInfo, messageExtractors, quotedMessage
+        } = await m_Content.default({ m, sock, cached, message })
+
+        // m
+        await m_Bot.default({ m, sock, cached, message, contextInfo })
+        await m_Chat.default({ m, sock, cached, message, contextInfo })
+        await m_Sender.default({ m, sock, cached, message, contextInfo })
+
+        // quoted
+        if (contextInfo.quotedMessage) {
+            await m_QuotedSender.default({ m, sock, cached, quotedMessage })
+        }
+
+        await m_assign.default({ m, sock, message });
+
+        // index: 1
+        try {
+            let control = { end: false };
+            const plugins = await sock.plugins.query({
+                before: true, index: 1
+            });
+
+            plugins.sort((a, b) => {
+                const priorityA = a.priority ?? Infinity;
+                const priorityB = b.priority ?? Infinity;
+                return priorityA - priorityB;
+            });
+
+            for (let plugin of plugins) {
+                if (control.end) break;
+                await plugin.script(m, {
+                    sock: sock,
+                    plugin: sock.plugins,
+                    store: sock.store,
+                    control: control
+                });
+            }
+            if (control.end) return;
+        } catch (e) {
+            console.error(e);
+        }
+
+        // ------
+        if (!sock.subBot && global.config.autoRead) {
+            if (message.message) await sock.readMessages([message.key]);
+        }
+
+        /*Banned*/ {
+            const user = m.sender.role(
+                'root', 'owner', 'mod', 'bot'
+            )
+
+            const chat_db = await m.chat.db()
+            if (chat_db.data.banned && !user) continue;
+
+            const user_db = await m.sender.db()
+            if (user_db.data.banned && !user) continue;
+        }
+
+        // chat grupo
+        if (m.chat.isGroup) await m_ChatGroup.default({ m, sock, cached })
+
+        if (message.messageStubType) {
+
+            // parse StubParameters
+            let parameters = []
+            if (Array.isArray(message.messageStubParameters)) {
+                for (const stubParameter of message.messageStubParameters) {
+                    try {
+                        if (typeof stubParameter === 'string') {
+                            parameters.push(JSON.parse(stubParameter))
+                        } else { parameters.push(stubParameter) }
+                    } catch (e) { parameters.push(stubParameter) }
+                }
+            }
+
+
+            const even = $proto?.WebMessageInfo?.StubType
+            const evento = Object.keys(even).find(key =>
+                even[key] === message.messageStubType)
+            const plugins = await sock.plugins.query({
+                case: evento,
+                stubtype: true
+            })
+            if (plugins[0]) {
+                console.log(sock.subBot ? (`SubBot: ${chalk.rgb(217, 150, 255).underline(sock.subBotSlot)} Owner: ${chalk.rgb(66, 206, 171).underline(sock.subBotOwnerId)} (${chalk.rgb(0, 217, 255).underline(sock.subBotOwnerName)})\n`) : 'main:Bot', chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue('STUBTYPE:'), chalk.rgb(0, 217, 255).underline(plugins[0].fileName))
+
+                await plugins[0].script(m, {
+                    parameters: parameters,
+                    plugin: sock.plugins,
+                    store: sock.store,
+                    even: evento,
+                    sock: sock,
+                })
+            } else {
+                console.log(sock.subBot ? (`SubBot: ${chalk.rgb(217, 150, 255).underline(sock.subBotSlot)} Owner: ${chalk.rgb(66, 206, 171).underline(sock.subBotOwnerId)} (${chalk.rgb(0, 217, 255).underline(sock.subBotOwnerName)})\n`) : 'main:Bot', chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue('STUBTYPE:'), chalk.rgb(0, 217, 255).underline(JSON.stringify({ even: evento, parameters: parameters }, 0, 2)))
+                continue;
+            }
+
+            if (plugins[0]) continue;
+        }
+
+        // index: 2
+        try {
+            let control = { end: false };
+            const plugins = await sock.plugins.query({
+                before: true, index: 2
+            });
+
+            plugins.sort((a, b) => {
+                const priorityA = a.priority ?? Infinity;
+                const priorityB = b.priority ?? Infinity;
+                return priorityA - priorityB;
+            });
+
+            for (let plugin of plugins) {
+                if (control.end) break;
+                await plugin.script(m, {
+                    sock: sock,
+                    plugin: sock.plugins,
+                    store: sock.store,
+                    control: control
+                });
+            }
+            if (control.end) return;
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (!message.message) continue;
+        if (!message.message[m.type]) m.type = [0, Object.keys(message.message)[0]]
+
+        console.log(sock.subBot ? (`SubBot: ${chalk.rgb(217, 150, 255).underline(sock.subBotSlot)} Owner: ${chalk.rgb(66, 206, 171).underline(sock.subBotOwnerId)} (${chalk.rgb(0, 217, 255).underline(sock.subBotOwnerName)})\n`) : 'main:Bot', chalk.white('['), chalk.magenta(moment().tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm:ss')).trim(), chalk.white(']'), chalk.blue(`MENSAJE:`), chalk.green('{'), chalk.rgb(255, 131, 0).underline(m.content.text == '' ? (m.type[0] ? m.type : m.type[1]) : m.content.text), chalk.green('}'), chalk.blue('De'), chalk.cyan(m.sender.name), 'Chat', m.chat.isGroup ? chalk.bgGreen('grupo:' + (m.chat.name || m.chat.id)) : chalk.bgRed('Privado:' + m.sender.role('bot') ? 'bot' : m.sender.name || m.sender.id))
+
+        if (!m.type[0]) continue;
+
+        m.body = m.content.text;
+
+        if (m.quoted) await m_PreParser.default({
+            m, sock, message, contextInfo
+        })
+
+        await m_Parser.default({ m, sock })
+
+        // index: 3
+        try {
+            let control = { end: false };
+            const plugins = await sock.plugins.query({
+                before: true, index: 3
+            });
+
+            plugins.sort((a, b) => {
+                const priorityA = a.priority ?? Infinity;
+                const priorityB = b.priority ?? Infinity;
+                return priorityA - priorityB;
+            });
+
+            for (let plugin of plugins) {
+                if (control.end) break;
+                await plugin.script(m, {
+                    sock: sock,
+                    plugin: sock.plugins,
+                    store: sock.store,
+                    control: control
+                });
+            }
+            if (control.end) return;
+        } catch (e) {
+            console.error(e);
+        }
+
+        try {
+            if (m.plugin) return await m
+                .plugin.script(m, {
+                    plugin: sock.plugins,
+                    store: sock.store,
+                    sock: sock,
+                })
+        } catch (e) {
+            console.log(chalk.white('['), chalk.redBright('ERROR'), chalk.white(']'), chalk.redBright('Error:'), util.format(e))
+            await m.react('error')
+            await sock.sendMessage(m.chat.id, { text: (`*[ Evento - ERROR ]*\n\n- Comando:* ${global.prefix + m.command}\n- Usuario:* wa.me/${m.sender.number}\n- Chat:* ${m.chat.id}\n${global.readMore}\n*\`[ERORR]\`:* ${util.format(e)}\n`) }, { quoted: m.message })
+            continue
+        }
+    }
+};
+
+==================================================
+ARCHIVO: core/handlers/m.assign.js
+==================================================
+// ./core/handlers/m.assign.js
+
+export default async function ({ m, sock, message }) {
+    try {
+        m.db = async (id) => {
+            if (id.endsWith('@g.us')) {
+                const db = await global.db
+                    .open('@chat:' + id)
+                return {
+                    data: db.data,
+                    _data: db.data,
+                    update: async () => {
+                        await db.update()
+                    }
+                }
+            } else if (id.endsWith('@lid')) {
+                const db = await global.db
+                    .open('@users')
+                db.data[id] ||= {
+                    name: '',
+                    banned: false,
+                    roles: {}
+                }
+                return {
+                    _data: db.data,
+                    data: db.data[id],
+                    update: async () => {
+                        await db.update()
+                    }
+                }
+            }
+        }
+
+        m.reply = async (text) => {
+            if (typeof text == 'string') {
+                const mentionedJid = (text.match(/@(\d{0,16})/g) || []).map(v => v.slice(1) + '@lid');
+                return sock.sendMessage(m.chat.id, { text: text, contextInfo: { mentionedJid }, text: text },
+                    (message && !message.messageStubType) ? { quoted: message } : {});
+            } else if (typeof text == 'object') return sock.sendMessage(m.chat.id, text,
+                (message && !message.messageStubType) ? { quoted: message } : {});
+            else return new Error('[E]: m.reply(string ?)')
+        }
+
+        m.setBan = async (id, state = true) => {
+            if (!id) return;
+            if (!id.endsWith('@g.us') &&
+                !id.endsWith('@lid')) return;
+            const db = await m.db(id)
+            db.data.banned = state
+            await db.update()
+        }
+
+
+        m.setRole = async (id, state, ...roles) => {
+            if (!id || !roles.length) return;
+            if (!id.endsWith('@lid')) return;
+            const db = await m.db(id);
+            db.data.roles ||= {};
+            for (const role of roles) {
+                db.data.roles[role] = state;
+            }
+            await db.update();
+            return true;
+        }
+
+        m.react = async (text) => {
+            if (!text) return;
+            if (typeof text !== 'string') return;
+            const react = global.REACT_EMOJIS[text];
+            return sock.sendMessage(m.chat.id, {
+                react: {
+                    text: react ?? text,
+                    key: message.key
+                }
+            });
+        }
+
+        m.sms = (type) => {
+            let msg = global.MSG[type]
+            if (!msg) return;
+            return m.reply(msg)
+        }
+
+    } catch (e) { console.error(e) }
+}
+
+==================================================
+ARCHIVO: core/handlers/m.bot.js
+==================================================
+// ./core/handlers/m.bot.js
+
+export default ({ m, sock, cached, message }) => {
+    m.bot = m.bot || {}
+    m.bot.roles = {}
+    m.bot.name = sock.user?.name || '';
+    m.bot.id = sock.user?.lid.includes(':') ? (sock.user?.lid.split(":")[0] + "@lid") : sock.user?.lid;
+    m.bot.user = '@' + m.bot.id?.split('@')[0] || undefined;
+    m.bot.fromMe = message.key.fromMe;
+
+    m.bot.getDesc = async () => await cached.sender.desc(m.bot.id);
+    m.bot.getPhoto = async () => await cached.sender.photo(m.bot.id, 'image')
+    m.bot.setPhoto = async (image) => await sock.updateProfilePicture(m.bot.id, image)
+    m.bot.setDesc = async (desc) => await sock.updateProfileStatus(desc)
+    m.bot.setName = async (name) => await sock.updateProfileName(name)
+    m.bot.join = async (link) => await sock.groupAcceptInvite(link)
+    m.bot.mute = async (id, Boolean, time = 1000 * 60 * 60 * 8) => {
+        if (Boolean) await sock.chatModify({ mute: time }, id, []);
+        else await sock.chatModify({ mute: null }, id, []);
+    }
+    m.bot.block = async (id, Boolean) => {
+        if (Boolean) await sock.updateBlockStatus(id, 'block');
+        else await sock.updateBlockStatus(id, 'unblock');
+    }
+    m.bot.role = async (...array) =>
+        array.some(role => m.bot.roles[role]);
+
+}
+
+==================================================
+ARCHIVO: core/handlers/m.cache.js
+==================================================
+// ./core/handlers/m.cache.js
+
+import { TmpStore } from '../../library/utils.js'
+
+const store = new TmpStore(1000 * 60);
+
+const memoAsync = async (string, fun) => {
+    if (store.has(string))
+        return store.get(string);
+    const result = await fun()
+    store.set(string, result);
+    return result;
+}
+
+export default ({ sock }) => {
+    const cached = {}
+    cached.group = {
+        photo: async (id, type) => {
+            return await memoAsync(`${id}-${type}-photo`, async () =>
+                await sock.profilePictureUrl(id, type).catch(_ =>
+                    'https://files.catbox.moe/obz4b4.jpg'));
+        },
+        metaData: async (id) => {
+            if (!id) return {};
+            if (id.endsWith('@s.whatsapp.net')) return {}
+            return await memoAsync(`${id}-metaData`, async () =>
+                await sock.groupMetadata(id).catch(e => ({})))
+        },
+        inviteCode: async (id) => {
+            return memoAsync(`${id}-inviteCode`, async () =>
+                await sock.groupInviteCode(id))
+        },
+        inviteLink: async (id) => {
+            return await memoAsync(`${id}-inviteLink`, async () =>
+                `https://chat.whatsapp.com/${await cached
+                    .group.inviteCode(id)}`);
+        }
+    }
+    cached.sender = {
+        photo: async (id, type) => {
+            return await memoAsync(`${id}-${type}-photo`, async () =>
+                await sock.profilePictureUrl(id, type).catch(_ =>
+                    'https://files.catbox.moe/obz4b4.jpg'));
+        },
+        desc: async (id) => {
+            return await memoAsync(`${id}-desc`, async () =>
+                (await sock.fetchStatus(id) || {})
+                    .status || 'undefined')
+        }
+    }
+
+    return cached
+}
+
+==================================================
+ARCHIVO: core/handlers/m.chat.group.js
+==================================================
+// ./core/handlers/m.chat.group.js
+
+export default async ({ m, cached }) => {
+    m.chat.metaData = await cached.group.metaData(m.chat.id);
+    m.chat.size = m.chat.metaData.size || 0
+    m.chat.desc = m.chat.metaData.desc || ''
+    m.chat.name = m.chat.metaData.subject || ''
+    m.chat.created = m.chat.metaData.creation || 0
+    m.chat.participants = m.chat.metaData.participants || []
+    m.chat.owner = m.chat.metaData.owner || m.chat.metaData
+        .subjectOwner || 'undefined'
+    m.chat.admins = m.chat.participants.filter(o => ['admin', 'superadmin']
+        .some(_ => _ === o.admin)).map(v => v.jid ?? v.id) || []
+
+    m.sender.roles.admin = m.chat.admins.includes(m.sender.id) || false
+    m.bot.roles.admin = m.chat.admins.includes(m.bot.id) || false
+}
+
+==================================================
+ARCHIVO: core/handlers/m.chat.js
+==================================================
+// ./core/handlers/m.chat.js
+const $db = global.db
+
+export default async ({ m, sock, cached, message }) => {
+    m.chat = m.chat || {}
+    m.chat.id = message.key.remoteJid ||
+        message.key.participant
+    m.chat.isGroup = m.chat.id.endsWith('@g.us')
+
+    if (m.chat.isGroup) Object.assign(m.chat, {
+        add: async (user) => await sock.groupParticipantsUpdate(m.chat.id, [user], 'add'),
+        remove: async (user) => await sock.groupParticipantsUpdate(m.chat.id, [user], 'remove'),
+        promote: async (user) => await sock.groupParticipantsUpdate(m.chat.id, [user], 'promote'),
+        demote: async (user) => await sock.groupParticipantsUpdate(m.chat.id, [user], 'demote'),
+        getPhoto: async (type = 'image', id) => await cached.group.photo(id ?? m.chat.id, type),
+        setPhoto: async (image) => await sock.updateProfilePicture(m.chat.id, image),
+        setDesc: async (desc) => await sock.groupUpdateDescription(m.chat.id, desc),
+        setName: async (name) => await sock.groupUpdateSubject(m.chat.id, name),
+        getCodeInvite: async () => await cached.group.inviteCode(m.chat.id),
+        getLinkInvite: async () => await cached.group.inviteLink(m.chat.id),
+        revoke: async () => await sock.groupRevokeInvite(m.chat.id),
+
+        settings: {
+            lock: async (bool) => await sock.groupSettingUpdate(m.chat.id, bool ? 'locked' : 'unlocked'),
+            announce: async (bool) => await sock.groupSettingUpdate(m.chat.id, bool ? 'announcement' : 'not_announcement'),
+            memberAdd: async (bool) => await sock.groupSettingUpdate(m.chat.id, bool ? 'all_member_add' : 'admin_add'),
+            joinApproval: async (bool) => await sock.groupJoinApprovalMode(m.chat.id, bool ? 'on' : 'off'),
+        },
+    })
+
+    else {
+        m.chat.getDesc = async () => await cached.sender.desc(m.chat.id);
+        m.chat.getPhoto = async () => await cached.sender.photo(m.chat.id, 'image')
+    }
+
+    try {
+        if (m.chat.isGroup) {
+            const db = await $db.open(
+                '@chat:' + m.chat.id)
+            db.data.settings ||= {}
+            db.data.users ||= {}
+
+            m.chat.db = async () => {
+                const data = await $db.open('@chat:' + m.chat.id)
+                return {
+                    data: data.data,
+                    _data: data.data,
+                    update: async () => {
+                        await data.update()
+                    }
+                }
+            }
+        } else {
+            const db = await $db.open('@users')
+            db.data[m.chat.id] ||= {}
+            await db.update()
+
+            m.chat.db = async () => {
+                const data = await $db.open('@users')
+                return {
+                    _data: data.data,
+                    data: data.data[m.chat.id],
+                    update: async () => {
+                        await data.update()
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error(e)
+    }
+
+    try {
+        if (global.config.saveHistory) {
+            m.chat.loadMessage = (id) =>
+                sock.loadMessage(m.chat.id, id)
+        }
+    } catch (e) {
+        console.error(e)
+    }
+}
+
+==================================================
+ARCHIVO: core/handlers/m.content.js
+==================================================
+// ./core/handlers/m.content.js
+import handlerLoader from '../../library/loader.js';
+
+export default async ({ m, sock, message }) => {
+    const extrator = handlerLoader.get('[+] extrator.content.js');
+    const messageExtractors = extrator.default
+
+    /// MESSAGE
+
+    m.type = (() => {
+        for (const type of Object.keys(messageExtractors)) {
+            try {
+                if (message?.message?.[type]) { return type; }
+                else { continue; }
+            } catch (e) { continue }
+        }
+    })()
+
+    const contextInfo = message?.message?.[m
+        .type]?.contextInfo || {}
+
+
+    const m_content_text = await (async () => {
+        try { return messageExtractors[m.type](message) || ''; }
+        catch (e) { return '' }
+    })();
+
+    m.content = {
+        text: m_content_text,
+        args: m_content_text?.trim().split(/ +/),
+        media: (
+            m.type == 'imageMessage'
+            || m.type == 'videoMessage'
+        ) ? {
+            mimeType: message?.message?.[m.type]?.mimetype || '',
+            fileName: message?.message?.[m.type]?.filename || '',
+            download: async () => await sock.downloadMedia(message)
+        } : false
+    }
+
+    // QUOTED
+
+    if (contextInfo.quotedMessage) {
+        m.quoted = {};
+
+        if (global.config.saveHistory) {
+            m.quoted.message = await sock.loadMessage(
+                message.key.remoteJid, contextInfo.stanzaId)
+        }
+
+        if (!m.quoted.message) {
+            m.quoted.message = {}
+            m.quoted.message.key = {
+                remoteJid: contextInfo.remoteJid || message.key.remoteJid,
+                fromMe: contextInfo.participant == sock.user.id.split(":")[0] + "@s.whatsapp.net",
+                participant: contextInfo.participant,
+                id: contextInfo.stanzaId
+            }
+            m.quoted.message.message = {
+                ...contextInfo.quotedMessage
+            }
+        }
+
+
+        const quoted = m.quoted.message
+        m.quoted.id = quoted.key.id
+
+        m.quoted.type = (() => {
+            for (const type of Object.keys({
+                'imageMessage': 'image',
+                'videoMessage': 'video',
+                'stickerMessage': 'sticker',
+                'documentMessage': 'document',
+                'audioMessage': 'audio',
+                ...messageExtractors
+            })) {
+                if (quoted.message[type])
+                    return type;
+            }
+        })()
+
+        m.quoted.type ||= Object.keys(quoted.message)[0]
+
+        const quoted_content_text = await (async () => {
+            try {
+                const fun = messageExtractors[m.quoted.type]
+                if (fun) return fun(quoted?.message) || ''
+                else return ''
+            } catch (e) { return '' }
+        })()
+
+        m.quoted.content = {
+            text: quoted_content_text || '',
+            args: quoted_content_text?.trim().split(/ +/),
+            media: (
+                quoted.message?.imageMessage
+                || quoted.message?.videoMessage
+                || quoted.message?.stickerMessage
+                || quoted.message?.documentMessage
+                || quoted.message?.audioMessage
+            ) ? {
+                mimeType: quoted.message?.[m.quoted.type]?.mimetype || '',
+                fileName: quoted.message?.[m.quoted.type]?.filename || '',
+                download: async () => await sock.downloadMedia(m.quoted.message)
+            } : false
+        }
+    }
+
+
+    return {
+        contextInfo,
+        messageExtractors
+    }
+}
+
+==================================================
+ARCHIVO: core/handlers/m.parser.js
+==================================================
+// ./core/handlers/m.parser.js
+
+export default async ({ m, sock }) => {
+    m.body = m.body ?? m.content.text;
+
+    m.tag = m.body ?
+        (m.body.match(/tag=[^ ]+/g) || [])
+            .map(tag => tag.split('=')[1]) : [];
+
+    m.body = m.tag.length > 0
+        ? m.body.replace(/tag=[^\s]+/g, '')
+            .replace(/\s+/g, ' ').trim() : m.body || '';
+
+    m.args = m.body.trim().split(/ +/).slice(1)
+    m.text = m.args.length > 0 ? m.args.join(" ") : m.body;
+
+    const Prefix = global.config.prefixes;
+
+    const queryPlugin = async (query) => {
+        let plugin = []
+
+        if (sock.subBot) {
+            plugin = await sock.plugins.query({
+                subBots: true, ...query
+            })
+        }
+
+        if (!plugin[0]) {
+            plugin = await sock.plugins.query({
+                subBots: false, ...query
+            })
+        }
+        return plugin
+    }
+
+    // usePrefix = true
+    if (Prefix && Prefix.includes(m.body[0])) {
+
+        m.command = m.body.substring(1).trim()
+            .split(/ +/)[0].toLowerCase()
+
+        const plugin = await queryPlugin({
+            case: m.command,
+            usePrefix: true,
+            command: true,
+        })
+
+        m.isCmd = plugin[0] ? true : false;
+        m.plugin = plugin[0] ?? null;
+
+    }
+
+    // usePrefix = false
+    else if (Prefix && !Prefix.includes(m.body[0])) {
+
+        m.command = m.body.trim()
+            .split(/ +/)[0].toLowerCase()
+
+        const plugin = await queryPlugin({
+            case: m.command,
+            usePrefix: false,
+            command: true,
+        })
+
+        m.isCmd = plugin[0] ? true : false;
+        m.plugin = plugin[0] ?? null;
+    }
+
+    // Prefix = undefined
+    else if (!Prefix) {
+        m.command = m.body.trim()
+            .split(/ +/)[0].toLowerCase()
+
+        const plugin = await queryPlugin({
+            case: m.command,
+            command: true,
+        })
+
+        m.isCmd = plugin[0] ? true : false;
+        m.plugin = plugin[0] ?? null;
+    }
+}
+
+==================================================
+ARCHIVO: core/handlers/m.pre.parser.js
+==================================================
+// ./core/handlers/m.pre.parser.js
+
+import lodash from 'lodash';
+
+const $db = global.db
+
+export default async ({ m, sock }) => {
+    const db = await $db.open('@reply:Handler')
+
+    if (!db.data[m.quoted.id]) return;
+    const replyHandler = lodash.cloneDeep(db.data[m.quoted.id])
+
+    const security = replyHandler.security || {}
+    const lifecycle = replyHandler.lifecycle || {}
+    const routes = replyHandler.routes || []
+    const state = replyHandler.state || {}
+
+    if (routes.length === 0) return;
+    if (security.userId && !(
+        security.userId === 'all' ||
+        security.userId === m.sender.id
+    )) return;
+
+    if (security.chatId && !(
+        security.chatId === 'all' ||
+        security.chatId === m.chat.id)) return;
+
+    if (security.scope && !(
+        (security.scope === 'all') ||
+        (security.scope === 'private' && !m.isGroup) ||
+        (security.scope === 'group' && m.isGroup)
+    )) return;
+
+    if (lifecycle.createdAt && lifecycle.createdAt > Date.now()) return;
+
+    const isExpired = lifecycle.expiresAt
+        && lifecycle.expiresAt < Date.now();
+    if (isExpired) {
+        await m.reply('El tiempo límite para responder a este mensaje ha finalizado.');
+        delete db.data[m.quoted.id];
+        await db.update();
+        return;
+    }
+
+    const routesSorted = [...routes].sort((a, b) =>
+        a.priority - b.priority);
+
+    for (const route of routesSorted) {
+        const guard = route.code.guard
+            ? eval(route.code.guard) : null;
+        const executor = route.code.executor
+            ? eval(route.code.executor) : null;
+
+        if (typeof guard == 'function') {
+            const o = await guard(m, {
+                state, lifecycle,
+                security, route, sock
+            })
+            if (!o) continue;
+        }
+
+        if (lifecycle.consumeOnce) {
+            delete db.data[m.quoted.id];
+            await db.update();
+        }
+
+        console.log(executor)
+
+        if (typeof executor == 'function') {
+            return await executor(m, {
+                state, lifecycle,
+                security, route, sock
+            });
+        }
+    }
+}
+
+==================================================
+ARCHIVO: core/handlers/m.quoted.sender.js
+==================================================
+// ./core/handlers/m.quoted.sender.js
+
+const $db = global.db
+
+export default async ({ m, cached }) => {
+    const db = await $db.open('@users')
+    const users = db.data
+
+    const quotedMessage = m.quoted.message
+    m.quoted.sender = {}
+
+    if (m.chat.isGroup && !m.quoted.sender.id) {
+        m.quoted.sender.id = quotedMessage.key.participant?.endsWith('@lid')
+            ? quotedMessage.key.participant : quotedMessage.key.participantAlt;
+    }
+
+    else if (!m.chat.isGroup && !m.quoted.sender.id) {
+        m.quoted.sender.id = quotedMessage.key.remoteJid.endsWith('@lid')
+            ? quotedMessage.key.remoteJid : quotedMessage.key.remoteJidAlt;
+    }
+
+    m.quoted.sender.roles = {
+        ...structuredClone(users[m.quoted.sender.id]?.roles || {})
+    }
+
+    m.quoted.sender.roles.bot = m.bot.id === m.quoted.sender.id;
+    
+    m.quoted.sender.role = async (...array) => array
+        .some(role => m.quoted.sender.roles[role]);
+
+    m.quoted.sender.name = quotedMessage.pushName
+        ?? (users[m.quoted.sender.id]?.name)
+        ?? (m.quoted.sender.id === m.bot.id ? m.bot.name : '')
+        ?? (m.quoted.sender.id === m.sender.id ? m.sender.name : '')
+
+    if (m.chat.isGroup) {
+        m.quoted.sender.number = quotedMessage.key.participantAlt?.split('@')[0] || undefined;
+    } else {
+        m.quoted.sender.number = quotedMessage.key.remoteJid?.split('@')[0] || undefined;
+    }
+
+    m.quoted.sender.getDesc = async () =>
+        await cached.sender.desc(m.quoted.sender.id);
+    
+    m.quoted.sender.getPhoto = async () =>
+        await cached.sender.photo(m.quoted.sender.id, 'image')
+}
+
+==================================================
+ARCHIVO: core/handlers/m.sender.js
+==================================================
+// ./core/handlers/m.sender.js
+
+const $db = global.db
+const userRoles = global.config.userRoles
+
+export default async ({ m, cached, message, contextInfo }) => {
+    m.sender = m.sender || {}
+    m.sender.roles = {}
+    m.sender.id = m.bot.fromMe ? m.bot.id : undefined;
+
+    if (m.chat.isGroup && !m.sender.id) {
+        m.sender.id = message.key.participant?.endsWith('@lid')
+            ? message.key.participant : message.key.participantAlt;
+    }
+
+    else if (!m.chat.isGroup && !m.sender.id) {
+        m.sender.id = message.key.remoteJid.endsWith('@lid')
+            ? message.key.remoteJid : message.key.remoteJidAlt;
+    }
+
+    m.sender.name = m.bot.fromMe ? m.bot.name : message.pushName || '';
+
+    if (m.chat.isGroup) {
+        m.sender.number = message.key.participantAlt?.split('@')[0] || undefined;
+    } else {
+        m.sender.number = message.key.remoteJid?.split('@')[0] || undefined;
+    }
+
+    m.sender.user = '@' + m.sender.id?.split('@')[0] || undefined;
+    m.sender.roles.bot = m.bot.id === m.sender.id;
+
+    m.sender.getDesc = async () => await cached.sender.desc(m.sender.id);
+    m.sender.getPhoto = async () => await cached.sender.photo(m.sender.id, 'image')
+    m.sender.role = async (...array) => array.some(role => m.sender.roles[role]);
+    m.sender.mentioned = contextInfo.mentionedJid ?? [];
+    m.sender.db = async () => {
+        const data = await $db.open('@users')
+        return {
+            _data: data,
+            data: data.data[m.sender.id],
+            update: async () => {
+                await data.update()
+            }
+        }
+    }
+
+    // store
+    const db = await $db.open('@users')
+    const roles = userRoles[m.sender.number]
+    const users = db.data
+
+    const rol = {
+        root: roles?.root || false,
+        owner: roles?.owner || false,
+        mod: roles?.mod || false,
+        vip: roles?.vip || false,
+    }
+
+    if (!users[m.sender.id]) {
+        users[m.sender.id] = {
+            name: m.sender.name,
+            banned: false,
+            roles: rol
+        }
+    }
+
+    if (roles) users[m.sender.id].roles = {
+        ...users[m.sender.id].roles,
+        ...roles
+    }
+
+    Object.assign(m.sender.roles,
+        structuredClone({
+            ...users[m.sender.id].roles
+        }))
+
+    await db.update()
+
+
+    // chat user stats
+    try {
+        if (m.chat.isGroup) {
+            const chat = await m.chat.db()
+            chat.data.users[m.sender.id] ||= { messages: 0 }
+            chat.data.users[m.sender.id].messages += 1
+            const type = Object.keys(message.message || {})[0]
+            chat.data.users[m.sender.id][type] ||= 0
+            chat.data.users[m.sender.id][type] += 1
+            await chat.update()
+        }
+    } catch (e) {
+        console.error(e)
+    }
+
+
+    try {
+        if (
+            m.message?.message
+            && global.config.saveHistory
+            && m.chat.isGroup) {
+
+            const chat = await global.db.open(
+                '@history/' + m.chat.id)
+            if (!chat.data) chat.data = {}
+            chat.data[m.id] = m.sender.id
+
+            const sender = await global.db.open(
+                '@history/' + m.chat.id + '/' + m.sender.id)
+
+            if (!Array.isArray(sender.data)) sender.data = []
+            sender.data.push(m.message)
+
+            if (sender.data.length > 50) {
+                const objeto = sender.data.shift()
+                if (objeto?.key?.id) delete chat
+                    .data[objeto.key.id]
+            }
+
+            await chat.update()
+            await sender.update()
+        }
+    } catch (e) {
+        console.error(e)
+    }
+
+}
+
+==================================================
+ARCHIVO: core/main.js
+==================================================
+// ./core/main.js
+
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+chalk.level = 2
+
+await import('../config.js')
+await import('./config.js')
+
+/*INDEX*/ {
+    const folder = path.resolve(`./storage/`)
+
+    fs.mkdirSync(folder, { recursive: true });
+    for (const _folder of ['creds', 'store', 'temp']) {
+        fs.mkdirSync(path.join(folder, _folder),
+            { recursive: true });
+    }
+
+    for (const key of Object.keys(process.env)) {
+        const env = process.env[key]
+        try { process.env[key] = JSON.parse(env) }
+        catch { process.env[key] = env }
+    }
+
+    process.on('uncaughtException', (err) => {
+        console.error(chalk.bgRedBright('[ERROR]'), err);
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+        console.error(chalk.bgRedBright('[REJECTION]'),
+            promise, 'reason:', reason);
+    });
+}
+
+// library
+import { MakeClient } from '../library/client.js';
+import { Plugins } from '../library/plugins.js';
+import handlerLoader from '../library/loader.js';
+import { SubBots } from '../library/bots.js';
+
+// tmp
+await import('../library/purge.js')
+const _path = global.$dir_main
+
+await handlerLoader.loadFiles();
+
+const plugins = new Plugins(_path.plugins, {
+    subBots: false,
+    usePrefix: true,
+    stubtype: false,
+    command: false,
+});
+
+const subBots = new SubBots(
+    './storage/subBots', plugins);
+
+await plugins.load()
+
+// start
+async function StartBot() {
+    const mainBot = new MakeClient();
+
+    mainBot.events.on('connection', async (update) => {
+        process.send(update)
+    });
+
+    const sock = await mainBot.start({
+        folderPath: _path.creds,
+        ...process.env.connOptions
+    });
+
+    mainBot.events.on('messages', async (m) => {
+        if (!mainBot.sock.plugins) mainBot.sock.plugins = plugins;
+        if (!mainBot.sock.subBots) mainBot.sock.subBots = subBots;
+
+        mainBot.sock.subBot = false;
+
+        try {
+            const chatUpdate = handlerLoader
+                .get('core.handler.js')
+            await chatUpdate.default(m, sock)
+        } catch (e) {
+            console.error(e);
+        }
+    })
+
+    sock.ev.on('call', async (call) => {
+        const callInfo = call[0]
+        if (callInfo.status === 'offer') await sock
+            .rejectCall(callInfo.id, callInfo.from)
+    })
+}
+
+await StartBot()
+
+
+==================================================
+ARCHIVO: index.js
+==================================================
+// ./index.js
+await import('./core/config.js')
+
+import path from "path";
+import chalk from "chalk";
+
+// libreria
+import runQuestion from './library/setup.js';
+import { ForkManager } from './library/fork.js';
+
+let _runQuestion = await runQuestion()
+const modulePath = path.resolve('./core/main.js')
+
+async function startMain() {
+    const mainBot = new ForkManager(modulePath, {
+        execArgv: ['--max-old-space-size=512'],
+        cwd: path.dirname('./'),
+        serialization: 'json',
+        // silent: true,
+        env: {
+            connOptions: { ..._runQuestion }
+        }
+    })
+
+    mainBot.event.set('message', async (m) => {
+        switch (m.type) {
+            case 'open': {
+                console.log(chalk.rgb(70, 209, 70)('Connection open:'), {
+                    ...m.data
+                });
+            } break
+            case 'close': {
+                console.log(chalk.rgb(201, 54, 54)('Connection close:'), {
+                    ...m.data
+                });
+            } break
+            case 'pairing': {
+                if (m.event === 'qr-code') {
+                    console.log(chalk.rgb(16, 61, 207)('qr code:'));
+                    console.log(m.data.qrCodeText);
+                }
+                else if (m.event === 'pin-code') {
+                    console.log(chalk.rgb(16, 61, 207)('pin code:'));
+                    console.log(m.data.formattedCode);
+                }
+            }
+        }
+    });
+
+    mainBot.event.set('exit', async ({ code, signal }) => {
+        console.log({ code, signal });
+        await new Promise(resolve =>
+            setTimeout(resolve, 2000));
+        await mainBot.start();
+    });
+
+    mainBot.event.set('error', (e) => {
+        console.error(`Error:`, e)
+    });
+
+    await mainBot.start()
+}
+
+await startMain()
+
+==================================================
+ARCHIVO: library/bind.js
+==================================================
+// ./library/sock.assign.js
+
+import {
+    generateWAMessageContent,
+    generateWAMessageFromContent,
+    downloadMediaMessage,
+} from '@whiskeysockets/baileys';
+
+const $db = global.db
+
+export default async function (sock) {
+    try {
+        sock.Baileys = async () => {
+            return (await import('@whiskeysockets/baileys')).default
+        }
+
+        sock.downloadMedia = async (message, type = 'buffer') => {
+            if (typeof message !== 'object')
+                return new Error('not a message object');
+            if (!message || !message.key || !message.key.id)
+                throw new Error('not a valid message object');
+            return await downloadMediaMessage(message, type, {
+                reuploadRequest: sock.updateMediaMessage
+            })
+        }
+
+        sock.generateWMContent = (o) => {
+            return generateWAMessageContent(o, {
+                upload: sock.waUploadToServer
+            })
+        }
+
+        sock.sendWAMContent = async (jid, message, options = {}) => {
+            const gmessage = await generateWAMessageFromContent(jid, message, options)
+            return sock.relayMessage(jid, gmessage.message, {})
+        }
+
+        sock.setReplyHandler = async (message, options = {}, expiresIn = 1000 * 60 * 15) => {
+            if (!message?.key?.id)
+                throw new Error('sock.setReplyHandler: message.key.id is required');
+
+            if (!options.routes || !Array.isArray(options.routes))
+                throw new Error('sock.setReplyHandler: options.routes must be an array');
+
+            for (const r of options.routes) {
+                if (!r.code || typeof r.code !== 'object')
+                    throw new Error('sock.setReplyHandler: each route must contain code{}');
+                if (!r.code.executor)
+                    throw new Error('sock.setReplyHandler: code.executor is required');
+            }
+
+            options.lifecycle = options.lifecycle || {};
+            options.security = options.security || {};
+            options.state = options.state || {};
+
+            if (expiresIn !== undefined) {
+                if (typeof expiresIn !== 'number' || isNaN(expiresIn)) {
+                    throw new Error('sock.setReplyHandler: expiresIn must be a number (ms)');
+                }
+                options.lifecycle.createdAt = Date.now();
+                options.lifecycle.expiresAt = Date.now() + expiresIn;
+            }
+
+            for (const route of options.routes) {
+                const code = route.code;
+
+                if (typeof code.guard === 'function') {
+                    code.guard = code.guard.toString();
+                }
+                if (typeof code.executor === 'function') {
+                    code.executor = code.executor.toString();
+                }
+            }
+
+            const db = await $db.open('@reply:Handler');
+            Object.assign(db.data, { [message.key.id]: options });
+            await db.update();
+        };
+
+        sock.loadMessage = async (jid, id) => {
+            if (!global.config.saveHistory)
+                return new Error('mainBotStore is not enabled')
+
+            const chat = await global.db.open(
+                '@history/' + jid
+            )
+            if (!chat.data) chat.data = {}
+            const senderId = chat.data[id]
+            if (!senderId) return null
+
+            const sender = await global.db.open(
+                '@history/' + jid + '/' + senderId
+            )
+            if (!Array.isArray(sender.data)) sender.data = []
+            return sender.data.find(m => m.key.id === id)
+        }
+
+    } catch (e) { console.error(e) }
+    return sock
+}
+
+==================================================
+ARCHIVO: library/bots.js
+==================================================
+import crypto from 'crypto';
+import { EventEmitter } from 'events';
+import fs from 'fs/promises';
+import path from 'path';
+import handlerLoader from './loader.js';
+import { MakeClient } from './client.js';
+
+const Id = (n = 4) =>
+    crypto.randomBytes(n)
+        .toString('hex')
+        .toUpperCase();
+
+export class SubBots {
+    constructor(basePath, plugins) {
+        this.plugins = plugins;
+        this.basePath = basePath;
+        this.bots = new Map();
+        this._db = null;
+    }
+
+    async getDB() {
+        const db = global.db
+        return await db.open('subBots');
+    }
+
+    #CrIn(slot, options, botData = {}) {
+        const client = new MakeClient({
+            syncFullHistory: false,
+            fireInitQueries: false,
+            getMessage: async () => null
+        });
+
+        return {
+            slot,
+            options,
+            bot: client,
+            events: new EventEmitter(),
+            status: 'disconnected',
+            ownerId: botData.ownerId || null,
+            ownerNumber: botData.ownerNumber || null,
+            ownerName: botData.ownerName || null,
+            startTime: null,
+            uptime: () => this.startTime
+                ? Date.now() - this.startTime : 0,
+            run: (opts = {}) => client.start({
+                ...options, ...opts
+            }),
+            stop: () => client.stop(),
+            restart: () => client.restart(),
+            logged: () => client.logged(),
+            db: async () => {
+                const db = await this.getDB();
+                return {
+                    data: db.data[slot],
+                    update: db.update,
+                    _data: db.data
+                };
+            }
+        };
+    }
+
+    async get(slot) {
+        if (this.bots.has(slot))
+            return this.bots.get(slot);
+        const db = await this.getDB();
+        const data = db.data[slot];
+        if (!data) return null;
+
+        const options = JSON.parse(data.options || '{}');
+        const instance = this.#CrIn(slot, options, data);
+        if (data.status !== 'disconnected') {
+            data.status = 'disconnected';
+            await db.update();
+        }
+
+        this.bots.set(slot, instance);
+        return instance;
+    }
+
+
+    async start(any = { connectType: 'qr-code' }) {
+        let slot, options, isNew = false;
+
+        if (typeof any === 'string') {
+            slot = any;
+            const existing = await this.get(slot);
+            if (!existing) return null;
+            options = existing.options;
+        } else {
+            isNew = true;
+            options = {};
+            slot = `slot-${Id()}`;
+            options.folderPath = path
+                .join(this.basePath, slot);
+            Object.assign(options, any)
+        }
+
+        const subBot = isNew ? this.#CrIn(
+            slot, options, {
+            ownerId: any.ownerId || null,
+            ownerNumber: any.ownerNumber || null,
+            ownerName: any.ownerName || null,
+        }) : await this.get(slot);
+
+        this.bots.set(slot, subBot);
+
+        subBot.bot.events.on('messages', async (m) => {
+            try {
+                const sock = subBot.bot.sock;
+                if (!sock.subBot) sock.subBot = true;
+                if (!sock.plugins) sock.plugins = this.plugins;
+                if (!sock.subBotSlot) sock.subBotSlot = slot;
+                if (!sock.subBotOwnerId) sock.subBotOwnerId = subBot.ownerId;
+                if (!sock.subBotOwnerNumber) sock.subBotOwnerNumber = subBot.ownerNumber;
+                if (!sock.subBotOwnerName) sock.subBotOwnerName = subBot.ownerName;
+
+                const handler = handlerLoader.get('core.handler.js');
+                if (handler) await handler.default(m, sock);
+            } catch (e) {
+                console.error(`[Error Mensajes ${slot}]:`, e);
+            }
+        });
+
+        subBot.bot.events.on('connection', async (update) => {
+            subBot.events.emit('connection', update);
+
+            const db = await this.getDB();
+            const { type, data } = update;
+
+            db.data[slot] ||= {};
+
+            if (type === 'open') {
+
+                //////////////////////////
+                const _data = db.data[slot];
+                _data.options = JSON.stringify(options);
+                _data.connectedAt = new Date().toISOString();
+                _data.ownerId ||= any.ownerId || null
+                _data.ownerNumber ||= any.ownerNumber || null
+                _data.ownerName ||= any.ownerName || null
+                _data.status = 'connected';
+                _data.info = data;
+
+                ///////////////////////////
+                subBot.status = 'connected';
+                subBot.startTime = Date.now();
+            }
+
+            else if (type === 'close' || type === 'replaced') {
+                this.bots.delete(slot);
+                delete db.data[slot];
+                subBot.status = 'disconnected';
+            }
+
+            else if (type === 'restart' || type === 'error') {
+                subBot.status = 'reconnecting';
+                db.data[slot].status = 'reconnecting';
+            }
+
+            if (type === 'error') {
+                const now = Date.now();
+                const last = new Date(db.data[slot].lastDisconnectedAt || 0).getTime();
+
+                if (now - last > 3600000) db.data[slot].points = 0;
+                if (last > 0 && (now - last) < 300000)
+                    db.data[slot].points = (db.data[slot].points || 0) + 1;
+
+                db.data[slot].status = 'disconnected';
+                db.data[slot].lastDisconnectedAt = new Date().toISOString();
+                subBot.status = 'disconnected';
+
+                if (db.data[slot].points >= 5) {
+                    console.error(`[SubBot ${slot}] Auto-eliminado por inestabilidad.`);
+                    await this.delete(slot);
+                    return;
+                }
+            }
+
+            await db.update();
+        });
+
+        subBot.run(typeof any === 'string'
+            ? { connectType: 'qr-code' } : {});
+
+        return subBot;
+    }
+
+    async stop(slot) {
+        const sub = await this.get(slot);
+        if (!sub) return false;
+        sub.bot.events.removeAllListeners();
+        sub.events.removeAllListeners();
+        await sub.stop();
+        const db = await this.getDB();
+        if (db.data[slot]) {
+            db.data[slot].status = 'disconnected';
+            await db.update();
+        }
+        return true;
+    }
+
+    async delete(slot) {
+        const sub = await this.get(slot);
+        if (!sub) return false;
+
+        try {
+            await sub.logged();
+            await sub.stop();
+            const db = await this.getDB();
+            delete db.data[slot];
+            await db.update();
+            this.bots.delete(slot);
+            const folder = this.basePath + '/' + slot;
+            const exists = await fs.access(folder)
+                .then(() => true).catch(() => false);
+            if (exists) await fs.rm(folder, {
+                recursive: true, force: true
+            }).catch(() => { })
+            return true;
+        } catch (e) {
+            console.error(`[Delete Error ${slot}]:`, e);
+            return false;
+        }
+    }
+
+    async restart(slot) {
+        const sub = await this.get(slot);
+        return sub ? await sub.restart() : false;
+    }
+
+    async list() {
+        const db = await this.getDB();
+        return Object.keys(db.data);
+    }
+
+    async startAll() {
+        const db = await this.getDB();
+        const slots = Object.keys(db.data);
+        for (const slot of slots) {
+            if (db.data[slot].status === 'connected') continue;
+            try {
+                await this.start(slot);
+                await new Promise(r =>
+                    setTimeout(r, 2000));
+            } catch (e) {
+                console.error(`[Error StartAll ${slot}]:`, e);
+                continue;
+            }
+        }
+    }
+
+    get Map() { return this.bots; }
+}
+
+==================================================
+ARCHIVO: library/client.js
+==================================================
+
+import {
+    Browsers,
+    DisconnectReason,
+    makeCacheableSignalKeyStore,
+    fetchLatestBaileysVersion,
+    useMultiFileAuthState
+} from '@whiskeysockets/baileys';
+
+import bind from './bind.js';
+import { EventEmitter } from 'events';
+import makeWASocket from '@whiskeysockets/baileys';
+import qrTerminal from 'qrcode-terminal';
+import { Boom } from '@hapi/boom';
+import { randomBytes } from 'crypto';
+import fs from 'fs/promises';
+import qrCode from 'qrcode';
+import pino from 'pino';
+
+const { version } = await fetchLatestBaileysVersion();
+
+const CONNECTION = {
+    version: version,
+    emitOwnEvents: true,
+    fireInitQueries: false,
+    syncFullHistory: false,
+    connectTimeoutMs: 60000,
+    retryRequestDelayMs: 5000,
+    keepAliveIntervalMs: 30000,
+    markOnlineOnConnect: false,
+    generateHighQualityLinkPreview: true,
+    logger: pino({ level: 'silent' }),
+    browser: Browsers.ubuntu('Chrome'),
+    patchMessageBeforeSending: (message) => {
+        const UintArray = (numero) => Uint8Array
+            .from(randomBytes(numero));
+        message.messageContextInfo ||= {};
+        const info = message.messageContextInfo;
+        info.messageSecret ||= UintArray(32);
+        info.threadId ||= [];
+        return message;
+    },
+    transactionOpts: {
+        maxCommitRetries: 5,
+        delayBetweenTriesMs: 5000
+    },
+    appStateMacVerification: {
+        patch: true,
+        snapshot: true
+    },
+}
+
+async function StartBot(object) {
+    object.connectOptions = {
+        ...CONNECTION, ...(object.connectOptions || {})
+    }
+
+    if (!object.folderPath) object.folderPath = './storage/creds'
+    if (!object.connectType) object.connectType = 'qr-code'
+    await fs.mkdir(object.folderPath, { recursive: true });
+
+    let { state, saveCreds } = await useMultiFileAuthState(object.folderPath)
+    const keyStore = makeCacheableSignalKeyStore(state.keys,
+        pino({ level: "fatal" }).child({ level: "fatal" }))
+
+    const sockConfig = {
+        ...object.connectOptions
+    }
+
+    sockConfig.auth = {
+        creds: state.creds,
+        keys: keyStore
+    }
+
+    if (object.connectType == 'qr-code') {
+        sockConfig.browser = Browsers.macOS('Desktop')
+    }
+
+    const sock = makeWASocket(sockConfig);
+
+    sock.ev.on('creds.update', saveCreds);
+
+    if (object.connectType == 'pin-code') {
+        let numero = object.phoneNumber.replace(/\D/g, '')
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const pairingCode = await sock.requestPairingCode(numero,
+            object.customCode ?? null);
+        const data = {
+            pairingCode: pairingCode,
+            formattedCode: pairingCode
+                .match(/.{1,4}/g)?.join("-") ??
+                pairingCode
+        }
+        object.events.emit('connection', {
+            type: 'pairing',
+            event: 'pin-code',
+            data: data
+        })
+    }
+
+    Object.assign(sock, await bind(sock));
+
+    sock.ev.on('messages.upsert', async (m) => {
+        object.events.emit('messages', m)
+    });
+
+    sock.ev.on('connection.update', async (update) => {
+        const { lastDisconnect, connection, qr } = update;
+
+        if (connection === 'close') {
+            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode || "error";
+
+            if ([
+                DisconnectReason.restartRequired, DisconnectReason.connectionLost,
+                DisconnectReason.connectionClosed, DisconnectReason.unavailableService,
+                DisconnectReason.timedOut
+            ].includes(reason)) {
+                object.events.emit('connection', { type: 'restart', reasonCode: reason });
+                if (reason === DisconnectReason.unavailableService)
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                await StartBot({ ...object, connectType: 'qr-code' })
+            }
+
+            else if ([
+                DisconnectReason.loggedOut, DisconnectReason.badSession,
+                DisconnectReason.multideviceMismatch, DisconnectReason.forbidden
+            ].includes(reason)) {
+                sock.ev.removeAllListeners();
+                sock.end(undefined);
+                object.events.emit('connection', { type: 'closed', reasonCode: reason });
+                const exists = await fs.access(object.folderPath)
+                    .then(() => true).catch(() => false);
+                if (exists) await fs.rm(object.folderPath, {
+                    recursive: true, force: true
+                });
+                object.resolve(null);
+                return;
+            }
+
+            else if (reason === DisconnectReason.connectionReplaced) {
+                object.events.emit('connection',
+                    { type: 'replaced', reasonCode: reason });
+                sock.ev.removeAllListeners();
+                sock.end(undefined);
+                object.resolve(null);
+                return;
+            } else {
+                object.events.emit('connection', {
+                    type: 'error', reasonCode: reason, ...(lastDisconnect || {})
+                });
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                await StartBot({ ...object, connectType: 'qr-code' })
+            }
+        }
+
+        if (connection === 'open') {
+            const data = {
+                ...sock.user,
+                lid: sock.user.lid.split(":")[0]
+                    + "@lid",
+                id: sock.user.id.split(":")[0]
+                    + "@s.whatsapp.net"
+            }
+            object.events.emit('connection', {
+                type: 'open', data
+            });
+
+            object.resolve(sock);
+            return;
+        }
+
+        if (qr) {
+            const data = {
+                rawQrCode: qr,
+                qrCodeImage: await qrCode.toDataURL(qr),
+                qrCodeText: await new Promise((resolve) =>
+                    qrTerminal.generate(qr, { small: true },
+                        (qrCode) => resolve(qrCode)))
+            }
+            object.events.emit('connection', {
+                type: 'pairing',
+                event: 'qr-code',
+                data
+            })
+        }
+    })
+}
+
+export class MakeClient {
+    constructor(connection) {
+        this.events = new EventEmitter()
+        this.connection = {
+            ...CONNECTION,
+            ...connection
+        }
+    }
+
+    async start(options) {
+        this.sock = await new Promise(
+            async resolve => await StartBot({
+                connectOptions: this.connection,
+                ...options, events: this.events,
+                resolve
+            }))
+
+        return this.sock;
+    }
+
+    async stop() {
+        if (!this.sock) return;
+        await this.sock?.ev?.removeAllListeners();
+        await this.sock?.end(undefined);
+        this.sock = null;
+    }
+
+    async restart() {
+        if (!this.sock) return;
+        else this.stop();
+        await new Promise(resolve =>
+            setTimeout(resolve, 2000));
+        return await this.start({
+            connectType: 'qr-code'
+        });
+    }
+
+    async logged() {
+        if (!this.sock) return;
+        await this.sock.logout();
+        await this.stop();
+        return true;
+    }
+}
+
+==================================================
+ARCHIVO: library/db.js
+==================================================
+/*
+ * -----------------------------------------------------------------------------------
+ * JunDB es una mierda para proyectos grandes.
+ * Esta DB es súper básica y solo está aquí para que el bot funcione rápido al inicio.
+ * Si tu proyecto se vuelve pesado o serio, usa una base de datos de verdad
+ * (PostgreSQL, MongoDB, etc.). JunDB no aguantará cosas pesadas.
+ * -----------------------------------------------------------------------------------
+ */
+
+// ./library/db.js
+import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+
+class Memory {
+    constructor(limitMB = 15, ttlSeconds = 30) {
+        this.limit = limitMB * 1024 * 1024;
+        this.ttl = ttlSeconds * 1000;
+        this.cells = new Map();
+        this.currentSize = 0;
+    }
+
+    #size(data) {
+        return Buffer.byteLength(
+            JSON.stringify(data));
+    }
+
+    set(key, data) {
+        if (this.cells.has(key))
+            this.delete(key);
+
+        const size = this.#size(data);
+        if (size > this.limit) return;
+        while (this.currentSize + size
+            > this.limit && this.cells.size > 0) {
+            const oldestKey = this.cells
+                .keys().next().value;
+            this.delete(oldestKey);
+        }
+
+        const timer = setTimeout(() =>
+            this.delete(key), this.ttl);
+        this.cells.set(key,
+            { data, size, timer });
+        this.currentSize += size;
+    }
+
+    get(key) {
+        const cell = this.cells.get(key);
+        if (!cell) return null;
+        const data = cell.data;
+        this.set(key, data);
+        return cell.data;
+    }
+
+    delete(key) {
+        const cell = this.cells.get(key);
+        if (cell) {
+            clearTimeout(cell.timer);
+            this.currentSize -= cell.size;
+            this.cells.delete(key);
+        }
+    }
+
+    has(key) {
+        return this.cells.has(key);
+    }
+}
+
+
+class Folder {
+    constructor(options = {}) {
+        options = {
+            folder: './data',
+            memoryLimit: 15,
+            memoryTTL: 30,
+            ...options
+        }
+
+        this.basePath = path.resolve(
+            options.folder);
+        this.RAM = new Memory(
+            options.memoryLimit,
+            options.memoryTTL);
+        this.Pipe = new Map();
+    }
+
+    async #pipe(filename, action) {
+        const next = (this.Pipe.get(filename) || Promise.resolve())
+            .then(() => action().catch(() => null)).finally(() =>
+                this.Pipe.get(filename) === next &&
+                this.Pipe.delete(filename));
+        return this.Pipe.set(filename,
+            next).get(filename);
+    }
+
+    async init() {
+        await fs.mkdir(this.basePath,
+            { recursive: true });
+        return this;
+    }
+
+    async read(filename) {
+        const cached = this.RAM.get(filename);
+        if (cached) return cached;
+        return this.#pipe(filename, async () => {
+            const filePath = path.join(this.basePath, filename);
+            const content = await fs.readFile(filePath, 'utf-8');
+            const data = JSON.parse(content);
+            this.RAM.set(filename, data);
+            return data;
+        });
+    }
+
+    async write(filename, data = {}) {
+        return this.#pipe(filename, async () => {
+            const filePath = path.join(this.basePath, filename);
+            const tempPath = filePath + '.tmp';
+            await fs.writeFile(tempPath, JSON.stringify(data, null, 2));
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await fs.rename(tempPath, filePath);
+            this.RAM.set(filename, data);
+            return true;
+        });
+    }
+
+    async remove(filename) {
+        return this.#pipe(filename, async () => {
+            const filePath = path.join(this.basePath, filename);
+            await fs.rm(filePath, { recursive: true, force: true });
+            this.RAM.delete(filename);
+            return true;
+        });
+    }
+
+    async exists(filename) {
+        if (this.RAM.has(filename)) return true;
+        return fs.access(path.join(this.basePath, filename))
+            .then(() => true).catch(() => false);
+    }
+}
+
+class DB {
+    constructor(storage, filename, data = {}) {
+        if (storage instanceof Folder) {
+            this.storage = storage;
+        } else {
+            const options = typeof storage === 'string'
+                ? { folder: storage } : storage;
+            this.storage = new Folder(options);
+        }
+
+        this.state = { timer: null, count: 0 };
+        this.name = filename;
+        this.data = data
+    }
+
+    async read() {
+        if (await this.storage.exists(this.name)) {
+            this.data = await this.storage.read(this.name);
+        } else {
+            await this.storage.write(this.name, this.data);
+        }
+        return this.data;
+    }
+
+    async #commit() {
+        this.state.count = 0;
+        if (this.state.timer) clearTimeout(this.state.timer);
+        this.state.timer = null;
+        return await this.storage.write(this.name, this.data);
+    }
+
+    async update() {
+        this.state.count++;
+        if (this.state.timer) clearTimeout(this.state.timer);
+        if (this.state.count >= 5) return await this.#commit();
+        this.state.timer = setTimeout(() => this.#commit(), 5000);
+        return true;
+    }
+
+    async remove() {
+        if (this.state.timer) clearTimeout(this.state.timer);
+        return await this.storage.remove(this.name);
+    }
+}
+
+class JunDB {
+    constructor() {
+        this.index = null;
+        this.storage = null;
+        this.active = new Map();
+        this.timers = new Map();
+    }
+
+    async init(options = {}) {
+        this.storage = new Folder(options);
+        await this.storage.init();
+        this.index = new DB(this
+            .storage, 'index.json');
+        await this.index.read();
+        return this;
+    }
+
+
+    #Idle(name) {
+        if (this.timers.has(name))
+            clearTimeout(this.timers.get(name));
+        const timer = setTimeout(async () => {
+            const db = this.active.get(name);
+            if (db && db.state.timer) {
+                return this.#Idle(name);
+            } else if (!db) return
+            this.active.delete(name);
+            this.timers.delete(name);
+        }, 60000);
+
+        this.timers.set(
+            name, timer);
+    }
+
+    async has(name) {
+        return !!this.index.data[name];
+    }
+
+    async open(name) {
+        if (this.active.has(name)) {
+            this.#Idle(name);
+            return this.active
+                .get(name);
+        }
+
+        let id;
+        if (this.index.data[name]) {
+            id = this.index.data[name].id;
+        } else {
+            id = crypto.randomBytes(2)
+                .toString('hex').toUpperCase();
+            this.index.data[name] = { id };
+            await this.index.update();
+        }
+
+        const db = new DB(this
+            .storage, `${id}.json`);
+        await db.read();
+
+        this.active
+            .set(name, db);
+        this.#Idle(name);
+        return db;
+    }
+
+    async delete(name) {
+        if (!this.index.data[name]) return false;
+        if (this.timers.has(name)) {
+            clearTimeout(this.timers.get(name));
+            this.timers.delete(name);
+        }
+
+        const db = await this.open(name);
+        await db.remove();
+
+        this.active.delete(name);
+        delete this.index.data[name];
+        await this.index.update();
+        return true;
+    }
+
+    list() {
+        return Object.keys(
+            this.index.data)
+    }
+}
+
+export { JunDB, DB }
+
+
+
+==================================================
+ARCHIVO: library/fork.js
+==================================================
+// ./library/fork.js
+
+import path from "path";
+import { fork } from "child_process";
+import EventEmitter from "events";
+
+export class ForkManager {
+    constructor(filePath, options) {
+        if (!typeof options.env == 'undefined')
+            return new Error('env:required');
+        this['@ev'] = new EventEmitter();
+        this.filePath = path.resolve(filePath);
+        this.options = options;
+        this.forkEvent = {}
+        this.startTime = null;
+        this.EventDefine = [
+            'message',
+            'error',
+            'exit']
+
+        this['@status'] = 'stop';
+        this.fork = null
+    }
+
+    get event() {
+        return {
+            set: (name, fun) => {
+                if (!(this.EventDefine).includes(name)) return;
+                if (typeof fun !== 'function') return;
+                this.forkEvent[name] = fun
+                return true
+            },
+            delete: (name) => {
+                if (!(this.EventDefine).includes(name)) return;
+                delete this.forkEvent[name]
+                return true
+            }
+        }
+    }
+
+    async stop(fun) {
+        try {
+            if (this.fork) await this.fork.kill('SIGTERM')
+            this['@status'] = 'stop';
+            if (typeof fun === 'function') return await fun(this);
+        } catch (error) {
+            console.error(`Error stopping process: ${error}`);
+        }
+    }
+
+    async start(fun) {
+        try {
+            if (this.fork) await this.stop()
+            this['@status'] = 'started';
+
+            const development = structuredClone(this.options)
+            Object.keys(development.env).forEach((key) => {
+                development.env[key] = JSON.stringify(development.env[key]);
+            })
+
+            this.fork = fork(this.filePath, {
+                ...(development || {}),
+            });
+
+            this.startTime = Date.now();
+            this.ev();
+
+            if (typeof fun === 'function') {
+                return await fun(this);
+            }
+        } catch (e) {
+            this['@status'] = 'stop';
+            console.error(e);
+        }
+    }
+
+    ev() {
+        if (!this.fork) return;
+        this.fork.on('message', async (m) => {
+            try {
+                if (typeof this.forkEvent?.message === 'function')
+                    return await this.forkEvent.message(m, this)
+            } catch (e) { console.error('Error handling message:', e) }
+        });
+        this.fork.on('error', async (m) => {
+            try {
+                if (typeof this.forkEvent?.error === 'function')
+                    return await this.forkEvent.error(m, this)
+            } catch (e) { console.error('Error handling error event:', e) }
+        });
+        this.fork.on('exit', async (code, signal) => {
+            try {
+                if (typeof this.forkEvent?.exit === 'function')
+                    return await this.forkEvent.exit({ code, signal }, this);
+            } catch (e) { console.error('Error handling exit event:', e); }
+        });
+    }
+
+    send(content) {
+        return this.fork.send(content)
+    }
+
+    get status() {
+        return {
+            process: this.fork,
+        };
+    }
+
+    get uptime() {
+        if (!this.startTime) return null;
+        return Date.now() - this.startTime;
+    }
+}
+
+==================================================
+ARCHIVO: library/loader.js
+==================================================
+// ./library/handlerLoader.js
+
+import path from "path";
+import { pathToFileURL } from 'url';
+import { watch } from 'chokidar';
+import fs from 'fs/promises';
+
+class handlerLoader {
+    constructor(folderPath) {
+        this.files = new Map();
+        this.folder = path.resolve
+            (folderPath);
+
+        this.watcher = watch(folderPath, {
+            ignoreInitial: true,
+            persistent: true
+        });
+
+        this.watcher.on('add', (file) => {
+            file = path.basename(file);
+            setTimeout(() => this
+                .loadFile(file), 1000);
+        })
+
+        this.watcher.on('unlink', (file) => {
+            file = path.basename(file)
+            if (this.files.has(file))
+                this.files.delete(file)
+        })
+
+        this.watcher.on('change', (file) => {
+            file = path.basename(file);
+            if (this.files.has(file))
+                this.files.delete(file)
+            setTimeout(() => this
+                .loadFile(file), 1000);
+        })
+    }
+
+    async loadFiles() {
+        const files = await fs
+            .readdir(this.folder)
+        for (const file of files) {
+            await this.loadFile(file)
+        }
+    }
+
+    async loadFile(fileName) {
+        if (!fileName.endsWith('.js')) return;
+        const filePath = `${this.folder}/${fileName}`
+        const fileURL = pathToFileURL(filePath);
+        try {
+            const file = await import(`${fileURL
+                .href}?update=${Date.now()}`)
+            this.files.set(fileName, file);
+        } catch (e) { console.error(e) }
+    }
+
+    get(fileName) {
+        if (this.files.has(fileName))
+            return this.files.get(fileName);
+        return null;
+    }
+}
+
+export default new handlerLoader('./core/handlers');
+
+==================================================
+ARCHIVO: library/plugins.js
+==================================================
+// ./library/plugins.js
+
+import path from "path";
+import { pathToFileURL } from 'url';
+import { watch } from 'chokidar';
+import lodash from 'lodash'
+
+/**
+ * API Usage:
+ * plugins.import('@funcion')
+ * plugins.import({ file: 'utils/file.js' })
+ * plugins.query({ role: 'admin' })
+ * plugins.export('db', connection)
+ */
+
+export class Plugins {
+    constructor(folderPath, defaultObjects = {}) {
+        this.registry = new Map();
+        this.shared = new Map();
+        this.folder = folderPath;
+        this.context = defaultObjects;
+        this.watcher = null;
+    }
+
+    remove(key) {
+        if (typeof key === 'string')
+            return this.registry.delete(key);
+        return null
+    }
+
+    import(query) {
+        if (typeof query === 'object' && query?.file)
+            return this.registry.get(query.file);
+        if (typeof query === 'string')
+            return this.shared.get(query) || null;
+        return null;
+    }
+
+    export(key, value) {
+        if (!this.shared.has(key))
+            this.shared.set(key, value);
+        else Object.assign(this
+            .shared.get(key), value);
+        return this.shared.get(key);
+    }
+
+    load() {
+        return new Promise((resolve, reject) => {
+            this.watcher = watch(this.folder, {
+                persistent: true,
+                ignoreInitial: false,
+                depth: 99
+            });
+
+            this.watcher.on('add', (filePath) => {
+                const relPath = path.relative(this.folder, filePath);
+                console.log(global.PLUGINS_MSG.newPlugin, relPath);
+                this.loadFile(relPath);
+            })
+
+            this.watcher.on('change', (filePath) => {
+                const relPath = path.relative(this.folder, filePath);
+                console.log(global.PLUGINS_MSG.updatedPlugin, relPath);
+                this.remove(relPath);
+                setTimeout(() => this.loadFile(relPath), 1000);
+            })
+
+            this.watcher.on('unlink', (filePath) => {
+                const relPath = path.relative(this.folder, filePath);
+                console.log(global.PLUGINS_MSG.deletedPlugin, relPath);
+                this.remove(relPath);
+            })
+
+            this.watcher.on('error', (e) => {
+                console.error("Watcher Error:", e);
+                reject(e);
+            }).on('ready', () => { resolve() });
+        });
+    }
+
+    async loadFile(file) {
+        if (typeof file !== 'string') return;
+
+        const absPath = path.join(this.folder, file);
+        const fileURL = (pathToFileURL(absPath)).href
+        const versionedURL = `${fileURL}?update=${Date.now()}`;
+
+        const _import = async (fun) => {
+            try { return await fun(await import(versionedURL)) } catch (e) {
+                if (e.code === 'ERR_UNSUPPORTED_DIR_IMPORT') return;
+                console.error(`Plugin Registration Error (${file}):`, e);
+            }
+        }
+
+        if (file.endsWith('.plugin.js')) return _import(async (mod) => {
+            const module = mod.default || mod;
+            if (typeof module.export === 'object') {
+                Object.entries(module.export).forEach(([k, v]) => {
+                    this.shared.set(k, v);
+                });
+            }
+
+            this.registry.set(file, {
+                ...this.context,
+                fileName: file,
+                ...module
+            });
+
+            return;
+        })
+
+        if (file.endsWith('.js')) return _import(async (mod) => {
+            this.registry.set(file, mod);
+        })
+
+        this.registry.set(file, absPath);
+    }
+
+    async query(object) {
+        if (typeof object === 'string') return this.registry.get(object);
+        if (typeof object !== 'object' || object === null) return [];
+
+        return Array.from(this.registry.entries()).filter(([filename, plugin]) => {
+            if (!filename.endsWith('.plugin.js')) return false;
+            return Object.entries(object).every(([key, expected]) => {
+                if (!plugin || typeof plugin !== 'object') return false;
+                const actual = plugin[key];
+                if (typeof expected === 'string' && Array.isArray(actual))
+                    return actual.includes(expected);
+                if (Array.isArray(expected) && typeof actual === 'string')
+                    return expected.includes(actual);
+                if (Array.isArray(expected) && Array.isArray(actual))
+                    return expected.some(v => actual.includes(v));
+                return lodash.isEqual(expected, actual);
+            });
+        }).map(([_, plugin]) => plugin);
+    }
+};
+
+==================================================
+ARCHIVO: library/purge.js
+==================================================
+// ./library/temp.js
+import path from 'path'
+import fs from 'fs/promises'
+
+const _path = global.$dir_main
+
+setInterval(async () => {
+    try {
+        const files = await fs.readdir(_path.temp)
+        if (files.length < 1) return false
+
+        const unlink = async (file) => {
+            try { await fs.unlink(path.join(_path.temp, file)) }
+            catch (e) { console.error(e) }
+        }
+
+        for (const file of files) {
+            unlink(file)
+        }
+    } catch (e) { console.error(e) }
+}, 1000 * 60)
+
+
+==================================================
+ARCHIVO: library/setup.js
+==================================================
+// ./library/run.question.js
+
+import { createInterface } from 'readline/promises';
+import fs from "fs";
+
+const readline = createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+export const question = async (text) =>
+    await new Promise(async resolve =>
+        resolve(await readline.question(text)));
+
+export default async () => {
+    const creds = fs.existsSync(`${global.$dir_main.creds}/creds.json`);
+
+    let connection = null
+    if (!connection && !creds) {
+        while (true) {
+            if (!connection && !creds) {
+                let text = ''
+                text += '\n\x1b[1;31m~\x1b[1;37m> '
+                text += '¿Cómo desea conectarse?\n'
+                text += '1. Código QR.\n'
+                text += '2. Código de 8 dígitos.\n'
+                text += 'Escriba "exit" para cancelar.\n'
+                text += '\x1b[1;31m~\x1b[1;37m> '
+
+                const opcion = (await question(text)).trim();
+
+                if (opcion === 'exit') break;
+
+                if (opcion === '1') {
+                    readline.close();
+                    return {
+                        connectType: 'qr-code',
+                        phoneNumber: ''
+                    };
+                }
+
+                if (opcion === '2') {
+                    while (true) {
+                        let text = ''
+                        text += '\n\x1b[1;31m~\x1b[1;37m> '
+                        text += '¿Cuál es el número que desea asignar como Bot?\n'
+                        text += '(Escriba "back" para volver)\n'
+                        text += '\x1b[1;31m~\x1b[1;37m> '
+                        let numero = await question(text);
+                        numero = numero.trim();
+
+
+                        if (numero.toLowerCase() === 'back') break;
+                        if (!numero) {
+                            console.log('\x1b[1;33mEl número es obligatorio. Por favor ingrese un número válido.\x1b[0m');
+                            continue;
+                        }
+
+                        readline.close();
+                        return {
+                            connectType: 'pin-code',
+                            phoneNumber: numero
+                        };
+                    }
+                } else {
+                    console.log('\x1b[1;33mOpción no válida. Intente de nuevo.\x1b[0m');
+                }
+            }
+        }
+        readline.close();
+        return {
+            connectType: 'qr-code',
+            phoneNumber: ''
+        };
+    }
+}
+
+==================================================
+ARCHIVO: library/utils.js
+==================================================
+// ./library/utils.js
+
+export class SimpleTimer {
+    constructor(fun, duration, type = 'timeout') {
+        if (typeof fun !== 'function') throw new Error('ERR_INVALID_CALLBACK');
+        if (typeof duration !== 'number' || duration <= 0) throw new Error('ERR_INVALID_DURATION');
+        if (!['timeout', 'interval'].includes(type)) throw new Error('ERR_INVALID_TYPE');
+        this.duration = duration;
+        this.timer = null;
+        this.type = type;
+        this.fun = fun;
+    }
+
+    start() {
+        this.stop();
+        if (this.type === 'timeout') {
+            this.timer = setTimeout(async () => {
+                try { await this.fun() }
+                catch (e) { console.error(`ERR_CALLBACK_EXECUTION:`, e) }
+                finally { this.timer = null }
+            }, this.duration);
+        } else if (this.type === 'interval') {
+            this.timer = setInterval(async () => {
+                try { await this.fun() }
+                catch (e) { console.error(`ERR_CALLBACK_EXECUTION:`, e) }
+            }, this.duration);
+        }
+    }
+
+    stop() {
+        if (this.timer !== null) {
+            if (this.type === 'timeout') clearTimeout(this.timer);
+            else if (this.type === 'interval') clearInterval(this.timer);
+            this.timer = null;
+        }
+    }
+
+    get status() {
+        return this.timer !== null;
+    }
+}
+
+export class TmpStore {
+    constructor(Time = 1000 * 60) {
+        this.objects = new Map();
+        this.Timeout = new Map();
+        this.Time = Time;
+
+        this.clearTime = (key) => {
+            const timeout = this.Timeout.get(key);
+            if (timeout) clearTimeout(timeout.time);
+        };
+    }
+
+    async set(key, value) {
+        if (this.Timeout.has(key))
+            this.clearTime(key);
+        this.objects.set(key, value);
+        this.Timeout.set(key, {
+            time: setTimeout(() =>
+                this.delete(key),
+                this.Time),
+        });
+
+        return value;
+    }
+
+    get(key) { return this.objects.get(key) }
+    has(key) { return this.objects.has(key) }
+    keys() { return Array.from(this.objects.keys()) }
+    values() { return Array.from(this.objects.values()) }
+
+    delete(key) {
+        if (this.objects.has(key)) {
+            this.clearTime(key);
+            this.objects.delete(key);
+            this.Timeout.delete(key);
+            return true;
+        }
+        return false;
+    }
+
+    clear() {
+        for (const key of this.Timeout.keys()) {
+            this.clearTime(key);
+        }
+        this.objects.clear();
+        this.Timeout.clear();
+    }
+}
+
+export const color = {
+    rgb: (r, g, b) => `\x1b[38;2;${r};${g};${b}m`,
+    bg: { rgb: (r, g, b) => `\x1b[48;2;${r};${g};${b}m` },
+    reset: '\x1b[0m'
+}
+
+==================================================
+ARCHIVO: package.json
+==================================================
+{
+  "name": "simple-base",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "npm install && node index.js"
+  },
+  "author": "Zeppth",
+  "dependencies": {
+    "@adiwajshing/keyed-db": "^0.2.4",
+    "@google/generative-ai": "^0.24.1",
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc.8",
+    "axios": "^1.6.2",
+    "chalk": "^5.3.0",
+    "cheerio": "1.0.0-rc.12",
+    "chokidar": "^4.0.1",
+    "dotenv": "^17.0.0",
+    "express": "^4.19.2",
+    "got": "^14.4.3",
+    "jimp": "^1.6.0",
+    "lodash": "^4.17.21",
+    "moment-timezone": "^0.5.43",
+    "node-cache": "5.1.2",
+    "pino": "9.1.0",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
+
