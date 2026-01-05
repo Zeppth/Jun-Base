@@ -1,14 +1,31 @@
 {
   "name": "jun-base",
   "version": "1.0.0",
-  "description": "",
+  "description": "Framework Event-Driven modular para bots de WhatsApp (Node.js ≥18.x) con aislamiento de procesos y pipeline de handlers encadenados.",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "build": "npm install && node index.js"
   },
+  "keywords": [
+    "bot-framework",
+    "whatsapp-bot",
+    "baileys",
+    "modular",
+    "event-driven",
+    "high-performance",
+    "jun-base"
+  ],
   "author": "Zeppth",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zeppth/Jun-Base.git"
+  },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@google/generative-ai": "^0.24.1",
